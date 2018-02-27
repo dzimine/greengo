@@ -1,0 +1,4 @@
+fire
+boto3
+botocore
+futures
