@@ -69,6 +69,48 @@ class GroupCommands(object):
 
         log.info("[END] creating group {0}".format(self.group['name']))
 
+    def deploy(self):
+        if not self.state:
+            log.info("There is nothing to deploy. Do create first.")
+            return
+
+        log.info("Deploying group '{0}'".format(self.state['Group']['Name']))
+
+        deployment = self._gg.create_deployment(
+            GroupId=self.state['Group']['Id'],
+            GroupVersionId=self.state['Group']['Version']['Version'],
+            DeploymentType="NewDeployment")
+        self.state['Deployment'] = rinse(deployment)
+        _update_state(self.state)
+
+        for i in range(15):
+            sleep(2)
+            deployment_status = self._gg.get_deployment_status(
+                GroupId=self.state['Group']['Id'],
+                DeploymentId=deployment['DeploymentId'])
+
+            status = deployment_status.get('DeploymentStatus')
+
+            log.debug("--- deploying... status: {0}".format(status))
+            # Known status values: ['Building | InProgress | Success | Failure']
+            if status == 'Success':
+                log.info("--- SUCCESS!")
+                self.state['Deployment']['Status'] = rinse(deployment_status)
+                _update_state(self.state)
+                return
+            elif status == 'Failure':
+                log.error("--- ERROR! {0}:{1}".format(
+                    deployment_status['ErrorDetails']['DetailedErrorMessage'],
+                    deployment_status['ErrorDetails']['DetailedErrorCode']))
+                self.state['Deployment']['Status'] = rinse(deployment_status)
+                _update_state(self.state)
+                return
+
+        log.warning(
+            "--- Gave up waiting for deployment. Please check the status later. "
+            "Make sure GreenGrass Core is running, connected to network, "
+            "and the certificates match.")
+
     def remove(self):
         if not self.state:
             log.info("There seem to be nothing to remove.")
@@ -78,6 +120,10 @@ class GroupCommands(object):
 
         self._remove_cores()
 
+        log.info("Reseting deployments forcefully, if they exist")
+        self._gg.reset_deployments(GroupId=self.state['Group']['Id'], Force=True)
+
+        log.info("Deleting group '{0}'".format(self.state['Group']['Id']))
         self._gg.delete_group(GroupId=self.state['Group']['Id'])
 
         os.remove(STATE_FILE)
@@ -95,17 +141,19 @@ class GroupCommands(object):
                 log.info("Creating a thing for core {0}".format(name))
                 keys_cert = rinse(self._iot.create_keys_and_certificate(setAsActive=True))
                 core_thing = rinse(self._iot.create_thing(thingName=name))
-                # (dzimine) This saved my ass when cleaning up
-                self._iot.update_thing(
-                    thingName=name,
-                    attributePayload={
-                        'attributes': {
-                            'thingArn': core_thing['thingArn'],
-                            'certificateId': keys_cert['certificateId']
-                        },
-                        'merge': True
-                    }
-                )
+                # # (dzimine) This saved my ass once when cleaning up
+                # # but no longer nessesary?
+                # self._iot.update_thing(
+                #     thingName=name,
+                #     attributePayload={
+                #         'attributes': {
+                #             'thingArn': core_thing['thingArn'],
+                #             'certificateId': keys_cert['certificateId']
+                #         },
+                #         'merge': True
+                #     }
+                # )
+
                 # Attach the previously created Certificate to the created Thing
                 self._iot.attach_thing_principal(
                     thingName=name, principal=keys_cert['certificateArn'])
@@ -159,33 +207,34 @@ class GroupCommands(object):
         for core in self.state['Cores']:
             thing_name = core['thing']['thingName']
             cert_id = core['keys']['certificateId']
-            log.info("Removing core thing {0} from core {1}".format(
+            log.info("Removing core thing '{0}'' from core '{1}'".format(
                 core['name'], thing_name))
 
-            log.debug('--- detaching policy: {0}'.format(core['policy']['policyName']))
+            log.debug("--- detaching policy: '{0}'".format(core['policy']['policyName']))
             self._iot.detach_principal_policy(
                 policyName=core['policy']['policyName'], principal=core['keys']['certificateArn'])
 
-            log.debug('--- deleting policy:{0}'.format(core['policy']['policyName']))
+            log.debug("--- deleting policy: '{0}'".format(core['policy']['policyName']))
             self._iot.delete_policy(policyName=core['policy']['policyName'])
 
-            log.debug('--- deactivating certificate: {0}'.format(core['keys']['certificateId']))
+            log.debug("--- deactivating certificate: '{0}'".format(core['keys']['certificateId']))
             self._iot.update_certificate(
                 certificateId=cert_id, newStatus='INACTIVE')
 
-            log.debug('--- detaching certificate:{0} from thing:{1}'.format(cert_id, thing_name))
+            log.debug(
+                "--- detaching certificate '{0}' from thing '{1}'".format(cert_id, thing_name))
             self._iot.detach_thing_principal(
                 thingName=thing_name, principal=core['keys']['certificateArn'])
             sleep(1)
 
-            log.debug('--- deleting certificate: {0}'.format(core['keys']['certificateId']))
+            log.debug("--- deleting certificate: '{0}'".format(core['keys']['certificateId']))
             self._iot.delete_certificate(certificateId=core['keys']['certificateId'])
 
-            log.debug('--- deleting thing: {0}'.format(core['thing']['thingName']))
+            log.debug("--- deleting thing: '{0}'".format(core['thing']['thingName']))
             self._iot.delete_thing(thingName=core['thing']['thingName'])
 
         core_def = self.state['CoreDefinition']
-        log.info("Removing core definition {0}".format(core_def['Name']))
+        log.info("Removing core definition '{0}'".format(core_def['Name']))
         self._gg.delete_core_definition(CoreDefinitionId=core_def['Id'])
 
     def _create_and_attach_thing_policy(self, thing_name, policy_doc, thing_cert_arn):
@@ -280,8 +329,7 @@ class GroupCommands(object):
 
 
 def rinse(boto_response):
-    response = boto_response.pop('ResponseMetadata')
-    log.debug("HTTP Status: {0}".format(response['HTTPStatusCode']))
+    boto_response.pop('ResponseMetadata')
     return boto_response
 
 

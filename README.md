@@ -49,7 +49,10 @@ Yeah this sucks... I'll automate it later, meantime PR welcome.
     ```
     python greenfly.py create
     ```
-    When runs with no errors, it creates all greengrass group artefacts on AWS.
+    When runs with no errors, it creates all greengrass group artefacts on AWS
+    and places certificates and `config.json` for GreenGrass Core in `./certs`
+    and `./config` for Vagrant to use in provisioning on next step.
+    
 
 2. Provision VM with GreenGrass Core with Vagrant
 
@@ -77,8 +80,22 @@ Yeah this sucks... I'll automate it later, meantime PR welcome.
     vagrant destroy
     ```
 
+> NOTE: If you create a new group but keep the GreenGrass Core in Vagrant VM,
+> you must update it with newly generated certificates and `config.json` file
+> before deploying the group.
+> Run `/vagrant/scripts/update_ggc.sh` from the Vagrant VM.
+
 # Details
 
 Coming... Stay tuned.
 
+# When something goes wrong
+Yes, it's not *if* but *when* somethings throws out, leaving the setup in half-deployed,
+and you gotta pick up the pieces. Remember:
+
+* You are still not worse off doing this manually: you at least have all the `ARN`
+and `Id` of all resources to clean-up.
+* DON'T DELETE `.group_state.json` file: it contains references to everything you need to delete.
+* Do what it takes to roll forward - if you're close to successful deployment, or roll-back - to clean things up and start from scratch.
+* Pay forward: add a patch to whatever broke to proof it from happening again.
 
