@@ -3,6 +3,7 @@ import errno
 import fire
 import json
 import yaml
+import shutil
 from time import sleep
 import logging
 from boto3.session import Session
@@ -15,7 +16,9 @@ log = logging.getLogger('iot-greengrass')
 log.setLevel(logging.DEBUG)
 
 
-STATE_FILE = '.group_state.json'
+DEFINITION_FILE = 'greengo.yaml'
+MAGIC_DIR = '.gg'
+STATE_FILE = os.path.join(MAGIC_DIR, '.gg_state.json')
 
 
 class GroupCommands(object):
@@ -25,10 +28,11 @@ class GroupCommands(object):
         session = Session()
         self._gg = session.client("greengrass")
         self._iot = session.client("iot")
+        self._lambda = session.client("lambda")
         self._region = session.region_name
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
-        with open('group.yaml', 'r') as f:
+        with open(DEFINITION_FILE, 'r') as f:
             self.group = self.group = yaml.safe_load(f)
 
         self.state = _load_state()
@@ -38,11 +42,11 @@ class GroupCommands(object):
             log.error("Previously created group exists. Remove before creating!")
             return False
 
-        log.info("[BEGIN] creating group {0}".format(self.group['name']))
+        log.info("[BEGIN] creating group {0}".format(self.group['Group']['name']))
 
         # 1. Create group
         # TODO: create group at the end, with "initial version"?
-        group = rinse(self._gg.create_group(Name=self.group['name']))
+        group = rinse(self._gg.create_group(Name=self.group['Group']['name']))
         self.state['Group'] = group
         _update_state(self.state)
         # Must update state on every step, else how can I clean?
@@ -67,7 +71,7 @@ class GroupCommands(object):
         self.state['Group']['Version'] = group_ver
         _update_state(self.state)
 
-        log.info("[END] creating group {0}".format(self.group['name']))
+        log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
     def deploy(self):
         if not self.state:
@@ -129,6 +133,45 @@ class GroupCommands(object):
         os.remove(STATE_FILE)
 
         log.info("[END] removing group {0}".format(self.group['name']))
+
+    def create_lambdas(self):
+        self.state['Lambdas'] = []
+        for l in self.group['Lambdas']:
+            log.info("Creating Lambda function '{0}'".format(l['name']))
+
+            role_arn = l['role']
+
+            zf = shutil.make_archive(
+                os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
+            log.debug("Lambda deployment Zipped to '{0}'".format(zf))
+
+            with open(zf, 'rb') as f:
+                lr = self._lambda.create_function(
+                    FunctionName=l['name'],
+                    Runtime='python2.7',
+                    Role=role_arn,
+                    Handler=l['handler'],
+                    Code=dict(ZipFile=f.read()),
+                    Environment=dict(Variables=l.get('environment', {}))
+                )
+
+            lr['ZipPath'] = zf
+            self.state['Lambdas'].append(rinse(lr))
+            _update_state(self.state)
+            log.info("Lambda function '{0}' created".format(lr['FunctionName']))
+
+    def remove_lambdas(self):
+        if not self.state and self.state.get('Lambdas'):
+            log.info("There seem to be nothing to remove.")
+            return
+
+        for l in self.state['Lambdas']:
+            log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
+            self._lambda.delete_function(FunctionName=l['FunctionName'])
+            os.remove(l['ZipPath'])
+
+        self.state.pop('Lambdas')
+        _update_state(self.state)
 
     def _create_cores(self):
         self.state['Cores'] = []
@@ -262,7 +305,7 @@ class GroupCommands(object):
         return policy
 
     def _create_core_policy(self):
-        # TODO: redo as template and read from group.yaml
+        # TODO: redo as template and read from definition file
         core_policy = {
             "Version": "2012-10-17",
             "Statement": [
@@ -334,10 +377,15 @@ def rinse(boto_response):
 
 
 def _update_state(group_state):
+    if not group_state:
+        os.remove(STATE_FILE)
+        log.debug("State is empty, removed state file '{0}'".format(STATE_FILE))
+        return
+
     with open(STATE_FILE, 'w') as f:
         json.dump(group_state, f, indent=2,
                   separators=(',', ': '), sort_keys=True)
-        log.debug("Updated group state in state file: {0}".format(STATE_FILE))
+        log.debug("Updated group state in state file '{0}'".format(STATE_FILE))
 
 
 def _state_exists():
