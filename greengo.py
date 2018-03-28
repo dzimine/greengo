@@ -29,11 +29,15 @@ class GroupCommands(object):
         self._gg = session.client("greengrass")
         self._iot = session.client("iot")
         self._lambda = session.client("lambda")
+        self._iam = session.client("iam")
         self._region = session.region_name
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
         with open(DEFINITION_FILE, 'r') as f:
             self.group = self.group = yaml.safe_load(f)
+
+        self.name = self.group['Group']['name']
+        self.LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
 
         self.state = _load_state()
 
@@ -135,11 +139,23 @@ class GroupCommands(object):
         log.info("[END] removing group {0}".format(self.group['name']))
 
     def create_lambdas(self):
+        if 'LambdaRole' not in self.state:
+            log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+            role = self._create_default_lambda_role()
+            self.state['LambdaRole'] = rinse(role)
+            _update_state(self.state)
+            # Function creation immediately after role creation
+            # fails with "The role defined for the function cannot be assumed by Lambda."
+            sleep(10)
+
         self.state['Lambdas'] = []
+        _update_state(self.state)
+
         for l in self.group['Lambdas']:
             log.info("Creating Lambda function '{0}'".format(l['name']))
 
-            role_arn = l['role']
+            role_arn = l['role'] if 'role' in l else self.state['LambdaRole']['Role']['Arn']
+            log.info("Assuming role '{0}'".format(role_arn))
 
             zf = shutil.make_archive(
                 os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
@@ -164,6 +180,11 @@ class GroupCommands(object):
         if not self.state and self.state.get('Lambdas'):
             log.info("There seem to be nothing to remove.")
             return
+
+        log.info("Deleting default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+        self._remove_default_lambda_role()
+        self.state.pop('LambdaRole')
+        _update_state(self.state)
 
         for l in self.state['Lambdas']:
             log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
@@ -354,6 +375,56 @@ class GroupCommands(object):
         with open(path + '/' + name, 'w') as f:
             json.dump(config, f, indent=4, separators=(',', ' : '))
 
+    def _create_default_lambda_role(self):
+        # TODO: redo as template and read from definition .yaml
+
+        role_policy_document = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+
+                }
+            ]
+        }
+
+        role = self._iam.create_role(
+            RoleName=self.LAMBDA_ROLE_NAME,
+            AssumeRolePolicyDocument=json.dumps(role_policy_document)
+        )
+
+        inline_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                    ],
+                    "Resource": "arn:aws:logs:*:*:*"
+                }
+            ]
+        }
+
+        self._iam.put_role_policy(
+            RoleName=self.LAMBDA_ROLE_NAME,
+            PolicyName=self.LAMBDA_ROLE_NAME + "-Policy",
+            PolicyDocument=json.dumps(inline_policy))
+
+        return role
+
+    def _remove_default_lambda_role(self):
+
+        for p in self._iam.list_role_policies(RoleName=self.LAMBDA_ROLE_NAME)['PolicyNames']:
+            self._iam.delete_role_policy(RoleName=self.LAMBDA_ROLE_NAME, PolicyName=p)
+
+        self._iam.delete_role(RoleName=self.LAMBDA_ROLE_NAME)
 
 ###############################################################################
 # UTILITY FUNCTIONS
@@ -372,7 +443,7 @@ def _update_state(group_state):
 
     with open(STATE_FILE, 'w') as f:
         json.dump(group_state, f, indent=2,
-                  separators=(',', ': '), sort_keys=True)
+                  separators=(',', ': '), sort_keys=True, default=str)
         log.debug("Updated group state in state file '{0}'".format(STATE_FILE))
 
 
