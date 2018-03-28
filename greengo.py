@@ -184,18 +184,6 @@ class GroupCommands(object):
                 log.info("Creating a thing for core {0}".format(name))
                 keys_cert = rinse(self._iot.create_keys_and_certificate(setAsActive=True))
                 core_thing = rinse(self._iot.create_thing(thingName=name))
-                # # (dzimine) This saved my ass once when cleaning up
-                # # but no longer nessesary?
-                # self._iot.update_thing(
-                #     thingName=name,
-                #     attributePayload={
-                #         'attributes': {
-                #             'thingArn': core_thing['thingArn'],
-                #             'certificateId': keys_cert['certificateId']
-                #         },
-                #         'merge': True
-                #     }
-                # )
 
                 # Attach the previously created Certificate to the created Thing
                 self._iot.attach_thing_principal(
