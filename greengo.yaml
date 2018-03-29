@@ -11,9 +11,22 @@ Lambdas:
   - name: GreengrassHelloWorld
     handler: function.handler
     package: lambdas/GreengrassHelloWorld
-    role: 'arn:aws:iam::012345678901:role/ExistingLambdaRole'
+    # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use existing role
     environment:
       foo: bar
+    greengrassConfig:
+      MemorySize: 128 # Mb
+      Timeout: 10
+      Pinned: True # Set True for long-lived functions
+      Environment:
+        AccessSysfs: False
+        ResourceAccessPolicies:
+          - ResourceId: /dev/vcsm
+            Permission: 'ro'
+          - ResourceId: /mydir
+            Permission: 'rw'
+        # Variables:
+        #    foo: bar
 
 Subscriptions: # not implemented
   - Id: 1

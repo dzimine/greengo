@@ -18,7 +18,7 @@ log.setLevel(logging.DEBUG)
 
 DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
-STATE_FILE = os.path.join(MAGIC_DIR, '.gg_state.json')
+STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
 
 
 class GroupCommands(object):
@@ -39,6 +39,7 @@ class GroupCommands(object):
         self.name = self.group['Group']['name']
         self.LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
 
+        _mkdir(MAGIC_DIR)
         self.state = _load_state()
 
     def create(self):
@@ -124,7 +125,7 @@ class GroupCommands(object):
             log.info("There seem to be nothing to remove.")
             return
 
-        log.info("[BEGIN] removing group {0}".format(self.group['name']))
+        log.info("[BEGIN] removing group {0}".format(self.group['Group']['name']))
 
         self._remove_cores()
 
@@ -136,9 +137,10 @@ class GroupCommands(object):
 
         os.remove(STATE_FILE)
 
-        log.info("[END] removing group {0}".format(self.group['name']))
+        log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
     def create_lambdas(self):
+        # TODO: Call only if needed: move under _create_default_lambda_role to call
         if 'LambdaRole' not in self.state:
             log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
             role = self._create_default_lambda_role()
@@ -148,6 +150,7 @@ class GroupCommands(object):
             # fails with "The role defined for the function cannot be assumed by Lambda."
             sleep(10)
 
+        functions = []
         self.state['Lambdas'] = []
         _update_state(self.state)
 
@@ -168,7 +171,8 @@ class GroupCommands(object):
                     Role=role_arn,
                     Handler=l['handler'],
                     Code=dict(ZipFile=f.read()),
-                    Environment=dict(Variables=l.get('environment', {}))
+                    Environment=dict(Variables=l.get('environment', {})),
+                    Publish=True
                 )
 
             lr['ZipPath'] = zf
@@ -176,10 +180,42 @@ class GroupCommands(object):
             _update_state(self.state)
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
 
+            alias = self._lambda.create_alias(
+                FunctionName=lr['FunctionName'],
+                Name='latest',
+                FunctionVersion='$LATEST',
+                Description='Points to the latest version'
+            )
+            log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
+                alias['FunctionVersion'], alias['AliasArn']))
+
+            functions.append({
+                'Id': l['name'].lower(),
+                'FunctionArn': alias['AliasArn'],
+                'FunctionConfiguration': l['greengrassConfig']
+            })
+
+        log.debug("Function definition list ready:\n{0}".format(json.dumps(functions, indent=4)))
+
+        log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
+        fd = self._gg.create_function_definition(
+            Name=self.name + '_func_def_1',
+            InitialVersion={'Functions': functions}
+        )
+        self.state['FunctionDefinition'] = rinse(fd)
+        _update_state(self.state)
+
     def remove_lambdas(self):
         if not self.state and self.state.get('Lambdas'):
             log.info("There seem to be nothing to remove.")
             return
+
+        log.info("Deleting function definition '{0}' Id='{1}".format(
+            self.state['FunctionDefinition']['Name'], self.state['FunctionDefinition']['Id']))
+        self._gg.delete_function_definition(
+            FunctionDefinitionId=self.state['FunctionDefinition']['Id'])
+        self.state.pop('FunctionDefinition')
+        _update_state(self.state)
 
         log.info("Deleting default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
         self._remove_default_lambda_role()
@@ -245,7 +281,7 @@ class GroupCommands(object):
                 initial_version))
 
             core_def = rinse(self._gg.create_core_definition(
-                Name="{0}_core_def".format(self.group['name']),
+                Name="{0}_core_def".format(self.group['Group']['name']),
                 InitialVersion=initial_version
             ))
 
