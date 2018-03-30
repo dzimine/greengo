@@ -10,9 +10,9 @@ from boto3.session import Session
 from botocore.exceptions import ClientError
 
 logging.basicConfig(
-    format='%(asctime)s|%(name)-8s|%(levelname)s: %(message)s',
+    format='%(asctime)s|%(name).10s|%(levelname)s: %(message)s',
     level=logging.INFO)
-log = logging.getLogger('iot-greengrass')
+log = logging.getLogger('greengo')
 log.setLevel(logging.DEBUG)
 
 
@@ -49,6 +49,9 @@ class GroupCommands(object):
 
         log.info("[BEGIN] creating group {0}".format(self.group['Group']['name']))
 
+        # TODO: create_lambda handles self.state directly.
+        #       _create_cores leaves it to a caller. Refactor?
+
         # 1. Create group
         # TODO: create group at the end, with "initial version"?
         group = rinse(self._gg.create_group(Name=self.group['Group']['name']))
@@ -63,17 +66,20 @@ class GroupCommands(object):
         self.state['CoreDefinition'] = core_def
         _update_state(self.state)
 
+        # 3. Create Lambda functions and function definitions
+        self.create_lambdas()
+
         # LAST. Add all the constituent parts to the Greengrass Group
-        group_ver = rinse(self._gg.create_group_version(
+        group_ver = self._gg.create_group_version(
             GroupId=group['Id'],
-            CoreDefinitionVersionArn=core_def['LatestVersionArn']
+            CoreDefinitionVersionArn=core_def['LatestVersionArn'],
             # DeviceDefinitionVersionArn="",
-            # FunctionDefinitionVersionArn="",
+            FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
             # LoggerDefinitionVersionArn="",
             # SubscriptionDefinitionVersionArn=""
-        ))
+        )
 
-        self.state['Group']['Version'] = group_ver
+        self.state['Group']['Version'] = rinse(group_ver)
         _update_state(self.state)
 
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
@@ -108,9 +114,7 @@ class GroupCommands(object):
                 _update_state(self.state)
                 return
             elif status == 'Failure':
-                log.error("--- ERROR! {0}:{1}".format(
-                    deployment_status['ErrorDetails']['DetailedErrorMessage'],
-                    deployment_status['ErrorDetails']['DetailedErrorCode']))
+                log.error("--- ERROR! {0}".format(deployment_status['ErrorMessage']))
                 self.state['Deployment']['Status'] = rinse(deployment_status)
                 _update_state(self.state)
                 return
@@ -129,6 +133,8 @@ class GroupCommands(object):
 
         self._remove_cores()
 
+        self.remove_lambdas()
+
         log.info("Reseting deployments forcefully, if they exist")
         self._gg.reset_deployments(GroupId=self.state['Group']['Id'], Force=True)
 
@@ -140,6 +146,10 @@ class GroupCommands(object):
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
     def create_lambdas(self):
+        if self.state and self.state.get('Lambdas'):
+            log.warning("Previously created Lambdas exists. Remove before creating!")
+            return
+
         # TODO: Call only if needed: move under _create_default_lambda_role to call
         if 'LambdaRole' not in self.state:
             log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
@@ -183,7 +193,7 @@ class GroupCommands(object):
             alias = self._lambda.create_alias(
                 FunctionName=lr['FunctionName'],
                 Name='latest',
-                FunctionVersion='$LATEST',
+                FunctionVersion=lr['Version'],  # use the version of just published function
                 Description='Points to the latest version'
             )
             log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
@@ -195,7 +205,7 @@ class GroupCommands(object):
                 'FunctionConfiguration': l['greengrassConfig']
             })
 
-        log.debug("Function definition list ready:\n{0}".format(json.dumps(functions, indent=4)))
+        log.debug("Function definition list ready:\n{0}".format(pretty(functions)))
 
         log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
         fd = self._gg.create_function_definition(
@@ -204,6 +214,18 @@ class GroupCommands(object):
         )
         self.state['FunctionDefinition'] = rinse(fd)
         _update_state(self.state)
+
+        log.info("Lambdas and function definition created OK!")
+
+        # TODO: Update group version if group exists
+        # group_ver = self._gg.create_group_version(
+        #     GroupId=group['Id'],
+        #     CoreDefinitionVersionArn=core_def['LatestVersionArn'],
+        #     # DeviceDefinitionVersionArn="",
+        #     FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
+        #     # LoggerDefinitionVersionArn="",
+        #     # SubscriptionDefinitionVersionArn=""
+        # )
 
     def remove_lambdas(self):
         if not self.state and self.state.get('Lambdas'):
@@ -469,6 +491,11 @@ class GroupCommands(object):
 def rinse(boto_response):
     boto_response.pop('ResponseMetadata')
     return boto_response
+
+
+def pretty(d):
+    """Pretty-print object as YAML."""
+    print(yaml.safe_dump(d, default_flow_style=False))
 
 
 def _update_state(group_state):

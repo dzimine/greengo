@@ -1,8 +1,8 @@
 # Greeengrass Group definition file
 Group:
-  name: ml_take2_group
+  name: GreengoGroup
 Cores:
-  - name: ml_take2_core_1
+  - name: GreengoGroup_core_1
     key_path: ./certs
     config_path: ./config
     SyncShadow: False
@@ -11,20 +11,20 @@ Lambdas:
   - name: GreengrassHelloWorld
     handler: function.handler
     package: lambdas/GreengrassHelloWorld
-    # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use existing role
+    # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use an existing role instead of auto-created one
     environment:
       foo: bar
     greengrassConfig:
       MemorySize: 128 # Mb
-      Timeout: 10
+      Timeout: 10 # Sec
       Pinned: True # Set True for long-lived functions
       Environment:
         AccessSysfs: False
         ResourceAccessPolicies:
-          - ResourceId: /dev/vcsm
-            Permission: 'ro'
-          - ResourceId: /mydir
+          - ResourceId: /vagrant
             Permission: 'rw'
+          # - ResourceId: /dev/vcsm # Configure access to local devices
+          #  Permission: 'ro'
         # Variables:
         #    foo: bar
 
