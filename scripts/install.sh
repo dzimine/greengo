@@ -16,5 +16,8 @@ sudo cp /vagrant/certs/* /greengrass/certs
 sudo cp /vagrant/config/* /greengrass/config
 sudo cp /vagrant/downloads/root.ca.pem /greengrass/certs
 
+# Back up group.json - you'll thank me later
+sudo cp /greengrass/ggc/deployment/group/group.json /greengrass/ggc/deployment/group/group.json.orig
+
 cd /greengrass/ggc/core
 sudo ./greengrassd start

@@ -3,19 +3,22 @@ import errno
 import fire
 import json
 import yaml
+import shutil
 from time import sleep
 import logging
 from boto3.session import Session
 from botocore.exceptions import ClientError
 
 logging.basicConfig(
-    format='%(asctime)s|%(name)-8s|%(levelname)s: %(message)s',
+    format='%(asctime)s|%(name).10s|%(levelname)s: %(message)s',
     level=logging.INFO)
-log = logging.getLogger('iot-greengrass')
+log = logging.getLogger('greengo')
 log.setLevel(logging.DEBUG)
 
 
-STATE_FILE = '.group_state.json'
+DEFINITION_FILE = 'greengo.yaml'
+MAGIC_DIR = '.gg'
+STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
 
 
 class GroupCommands(object):
@@ -25,12 +28,18 @@ class GroupCommands(object):
         session = Session()
         self._gg = session.client("greengrass")
         self._iot = session.client("iot")
+        self._lambda = session.client("lambda")
+        self._iam = session.client("iam")
         self._region = session.region_name
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
-        with open('group.yaml', 'r') as f:
+        with open(DEFINITION_FILE, 'r') as f:
             self.group = self.group = yaml.safe_load(f)
 
+        self.name = self.group['Group']['name']
+        self.LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
+
+        _mkdir(MAGIC_DIR)
         self.state = _load_state()
 
     def create(self):
@@ -38,11 +47,14 @@ class GroupCommands(object):
             log.error("Previously created group exists. Remove before creating!")
             return False
 
-        log.info("[BEGIN] creating group {0}".format(self.group['name']))
+        log.info("[BEGIN] creating group {0}".format(self.group['Group']['name']))
+
+        # TODO: create_lambda handles self.state directly.
+        #       _create_cores leaves it to a caller. Refactor?
 
         # 1. Create group
         # TODO: create group at the end, with "initial version"?
-        group = rinse(self._gg.create_group(Name=self.group['name']))
+        group = rinse(self._gg.create_group(Name=self.group['Group']['name']))
         self.state['Group'] = group
         _update_state(self.state)
         # Must update state on every step, else how can I clean?
@@ -54,20 +66,23 @@ class GroupCommands(object):
         self.state['CoreDefinition'] = core_def
         _update_state(self.state)
 
+        # 3. Create Lambda functions and function definitions
+        self.create_lambdas()
+
         # LAST. Add all the constituent parts to the Greengrass Group
-        group_ver = rinse(self._gg.create_group_version(
-            GroupId=group['Id'],
-            CoreDefinitionVersionArn=core_def['LatestVersionArn']
+        group_ver = self._gg.create_group_version(
+            GroupId=self.state['Group']['Id'],
+            CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
             # DeviceDefinitionVersionArn="",
-            # FunctionDefinitionVersionArn="",
+            FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
             # LoggerDefinitionVersionArn="",
             # SubscriptionDefinitionVersionArn=""
-        ))
+        )
 
-        self.state['Group']['Version'] = group_ver
+        self.state['Group']['Version'] = rinse(group_ver)
         _update_state(self.state)
 
-        log.info("[END] creating group {0}".format(self.group['name']))
+        log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
     def deploy(self):
         if not self.state:
@@ -99,9 +114,7 @@ class GroupCommands(object):
                 _update_state(self.state)
                 return
             elif status == 'Failure':
-                log.error("--- ERROR! {0}:{1}".format(
-                    deployment_status['ErrorDetails']['DetailedErrorMessage'],
-                    deployment_status['ErrorDetails']['DetailedErrorCode']))
+                log.error("--- ERROR! {0}".format(deployment_status['ErrorMessage']))
                 self.state['Deployment']['Status'] = rinse(deployment_status)
                 _update_state(self.state)
                 return
@@ -116,9 +129,11 @@ class GroupCommands(object):
             log.info("There seem to be nothing to remove.")
             return
 
-        log.info("[BEGIN] removing group {0}".format(self.group['name']))
+        log.info("[BEGIN] removing group {0}".format(self.group['Group']['name']))
 
         self._remove_cores()
+
+        self.remove_lambdas()
 
         log.info("Reseting deployments forcefully, if they exist")
         self._gg.reset_deployments(GroupId=self.state['Group']['Id'], Force=True)
@@ -128,9 +143,118 @@ class GroupCommands(object):
 
         os.remove(STATE_FILE)
 
-        log.info("[END] removing group {0}".format(self.group['name']))
+        log.info("[END] removing group {0}".format(self.group['Group']['name']))
+
+    def create_lambdas(self):
+        if self.state and self.state.get('Lambdas'):
+            log.warning("Previously created Lambdas exists. Remove before creating!")
+            return
+
+        # TODO: Call only if needed: move under _create_default_lambda_role to call
+        if 'LambdaRole' not in self.state:
+            log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+            role = self._create_default_lambda_role()
+            self.state['LambdaRole'] = rinse(role)
+            _update_state(self.state)
+            # Function creation immediately after role creation
+            # fails with "The role defined for the function cannot be assumed by Lambda."
+            sleep(10)
+
+        functions = []
+        self.state['Lambdas'] = []
+        _update_state(self.state)
+
+        for l in self.group['Lambdas']:
+            log.info("Creating Lambda function '{0}'".format(l['name']))
+
+            role_arn = l['role'] if 'role' in l else self.state['LambdaRole']['Role']['Arn']
+            log.info("Assuming role '{0}'".format(role_arn))
+
+            zf = shutil.make_archive(
+                os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
+            log.debug("Lambda deployment Zipped to '{0}'".format(zf))
+
+            with open(zf, 'rb') as f:
+                lr = self._lambda.create_function(
+                    FunctionName=l['name'],
+                    Runtime='python2.7',
+                    Role=role_arn,
+                    Handler=l['handler'],
+                    Code=dict(ZipFile=f.read()),
+                    Environment=dict(Variables=l.get('environment', {})),
+                    Publish=True
+                )
+
+            lr['ZipPath'] = zf
+            self.state['Lambdas'].append(rinse(lr))
+            _update_state(self.state)
+            log.info("Lambda function '{0}' created".format(lr['FunctionName']))
+
+            alias = self._lambda.create_alias(
+                FunctionName=lr['FunctionName'],
+                Name='latest',
+                FunctionVersion=lr['Version'],  # use the version of just published function
+                Description='Points to the latest version'
+            )
+            log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
+                alias['FunctionVersion'], alias['AliasArn']))
+
+            functions.append({
+                'Id': l['name'].lower(),
+                'FunctionArn': alias['AliasArn'],
+                'FunctionConfiguration': l['greengrassConfig']
+            })
+
+        log.debug("Function definition list ready:\n{0}".format(pretty(functions)))
+
+        log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
+        fd = self._gg.create_function_definition(
+            Name=self.name + '_func_def_1',
+            InitialVersion={'Functions': functions}
+        )
+        self.state['FunctionDefinition'] = rinse(fd)
+        _update_state(self.state)
+
+        log.info("Lambdas and function definition created OK!")
+
+        # TODO: Update group version if group exists
+        # group_ver = self._gg.create_group_version(
+        #     GroupId=group['Id'],
+        #     CoreDefinitionVersionArn=core_def['LatestVersionArn'],
+        #     # DeviceDefinitionVersionArn="",
+        #     FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
+        #     # LoggerDefinitionVersionArn="",
+        #     # SubscriptionDefinitionVersionArn=""
+        # )
+
+    def remove_lambdas(self):
+        if not (self.state and self.state.get('Lambdas')):
+            log.info("There seem to be nothing to remove.")
+            return
+
+        log.info("Deleting function definition '{0}' Id='{1}".format(
+            self.state['FunctionDefinition']['Name'], self.state['FunctionDefinition']['Id']))
+        self._gg.delete_function_definition(
+            FunctionDefinitionId=self.state['FunctionDefinition']['Id'])
+        self.state.pop('FunctionDefinition')
+        _update_state(self.state)
+
+        log.info("Deleting default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+        self._remove_default_lambda_role()
+        self.state.pop('LambdaRole')
+        _update_state(self.state)
+
+        for l in self.state['Lambdas']:
+            log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
+            self._lambda.delete_function(FunctionName=l['FunctionName'])
+            os.remove(l['ZipPath'])
+
+        self.state.pop('Lambdas')
+        _update_state(self.state)
 
     def _create_cores(self):
+        # TODO: Refactor-handle state internally, make callable individually
+        #       Maybe reflet dependency tree in self.group/greensgo.yaml and travel it
         self.state['Cores'] = []
         cores = []
         initial_version = {'Cores': []}
@@ -141,18 +265,6 @@ class GroupCommands(object):
                 log.info("Creating a thing for core {0}".format(name))
                 keys_cert = rinse(self._iot.create_keys_and_certificate(setAsActive=True))
                 core_thing = rinse(self._iot.create_thing(thingName=name))
-                # # (dzimine) This saved my ass once when cleaning up
-                # # but no longer nessesary?
-                # self._iot.update_thing(
-                #     thingName=name,
-                #     attributePayload={
-                #         'attributes': {
-                #             'thingArn': core_thing['thingArn'],
-                #             'certificateId': keys_cert['certificateId']
-                #         },
-                #         'merge': True
-                #     }
-                # )
 
                 # Attach the previously created Certificate to the created Thing
                 self._iot.attach_thing_principal(
@@ -170,7 +282,6 @@ class GroupCommands(object):
                     'policy': policy
                 })
 
-                # XXX: Temp - record on each step. Refactor!!!
                 self.state['Cores'] = cores
                 _update_state(self.state)
 
@@ -193,7 +304,7 @@ class GroupCommands(object):
                 initial_version))
 
             core_def = rinse(self._gg.create_core_definition(
-                Name="{0}_core_def".format(self.group['name']),
+                Name="{0}_core_def".format(self.group['Group']['name']),
                 InitialVersion=initial_version
             ))
 
@@ -262,7 +373,7 @@ class GroupCommands(object):
         return policy
 
     def _create_core_policy(self):
-        # TODO: redo as template and read from group.yaml
+        # TODO: redo as template and read from definition file
         core_policy = {
             "Version": "2012-10-17",
             "Statement": [
@@ -323,6 +434,56 @@ class GroupCommands(object):
         with open(path + '/' + name, 'w') as f:
             json.dump(config, f, indent=4, separators=(',', ' : '))
 
+    def _create_default_lambda_role(self):
+        # TODO: redo as template and read from definition .yaml
+
+        role_policy_document = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+
+                }
+            ]
+        }
+
+        role = self._iam.create_role(
+            RoleName=self.LAMBDA_ROLE_NAME,
+            AssumeRolePolicyDocument=json.dumps(role_policy_document)
+        )
+
+        inline_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                    ],
+                    "Resource": "arn:aws:logs:*:*:*"
+                }
+            ]
+        }
+
+        self._iam.put_role_policy(
+            RoleName=self.LAMBDA_ROLE_NAME,
+            PolicyName=self.LAMBDA_ROLE_NAME + "-Policy",
+            PolicyDocument=json.dumps(inline_policy))
+
+        return role
+
+    def _remove_default_lambda_role(self):
+
+        for p in self._iam.list_role_policies(RoleName=self.LAMBDA_ROLE_NAME)['PolicyNames']:
+            self._iam.delete_role_policy(RoleName=self.LAMBDA_ROLE_NAME, PolicyName=p)
+
+        self._iam.delete_role(RoleName=self.LAMBDA_ROLE_NAME)
 
 ###############################################################################
 # UTILITY FUNCTIONS
@@ -333,11 +494,21 @@ def rinse(boto_response):
     return boto_response
 
 
+def pretty(d):
+    """Pretty-print object as YAML."""
+    print(yaml.safe_dump(d, default_flow_style=False))
+
+
 def _update_state(group_state):
+    if not group_state:
+        os.remove(STATE_FILE)
+        log.debug("State is empty, removed state file '{0}'".format(STATE_FILE))
+        return
+
     with open(STATE_FILE, 'w') as f:
         json.dump(group_state, f, indent=2,
-                  separators=(',', ': '), sort_keys=True)
-        log.debug("Updated group state in state file: {0}".format(STATE_FILE))
+                  separators=(',', ': '), sort_keys=True, default=str)
+        log.debug("Updated group state in state file '{0}'".format(STATE_FILE))
 
 
 def _state_exists():
