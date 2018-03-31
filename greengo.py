@@ -71,8 +71,8 @@ class GroupCommands(object):
 
         # LAST. Add all the constituent parts to the Greengrass Group
         group_ver = self._gg.create_group_version(
-            GroupId=group['Id'],
-            CoreDefinitionVersionArn=core_def['LatestVersionArn'],
+            GroupId=self.state['Group']['Id'],
+            CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
             # DeviceDefinitionVersionArn="",
             FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
             # LoggerDefinitionVersionArn="",
@@ -228,7 +228,7 @@ class GroupCommands(object):
         # )
 
     def remove_lambdas(self):
-        if not self.state and self.state.get('Lambdas'):
+        if not (self.state and self.state.get('Lambdas')):
             log.info("There seem to be nothing to remove.")
             return
 
@@ -253,6 +253,8 @@ class GroupCommands(object):
         _update_state(self.state)
 
     def _create_cores(self):
+        # TODO: Refactor-handle state internally, make callable individually
+        #       Maybe reflet dependency tree in self.group/greensgo.yaml and travel it
         self.state['Cores'] = []
         cores = []
         initial_version = {'Cores': []}
@@ -280,7 +282,6 @@ class GroupCommands(object):
                     'policy': policy
                 })
 
-                # XXX: Temp - record on each step. Refactor!!!
                 self.state['Cores'] = cores
                 _update_state(self.state)
 

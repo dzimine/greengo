@@ -15,18 +15,18 @@ Lambdas:
     environment:
       foo: bar
     greengrassConfig:
-      MemorySize: 128 # Mb
+      MemorySize: 128000 # Kb, ask AWS why
       Timeout: 10 # Sec
       Pinned: True # Set True for long-lived functions
       Environment:
         AccessSysfs: False
-        ResourceAccessPolicies:
-          - ResourceId: /vagrant
-            Permission: 'rw'
+        # ResourceAccessPolicies:
+          # - ResourceId: /vagrant
+          #  Permission: 'rw'
           # - ResourceId: /dev/vcsm # Configure access to local devices
           #  Permission: 'ro'
-        # Variables:
-        #    foo: bar
+        Variables:
+           name: value
 
 Subscriptions: # not implemented
   - Id: 1
