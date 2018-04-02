@@ -190,9 +190,10 @@ class GroupCommands(object):
             _update_state(self.state)
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
 
+            # TODO: save alias (or aliases) to the state, or "functions"
             alias = self._lambda.create_alias(
                 FunctionName=lr['FunctionName'],
-                Name='latest',
+                Name=l.get('alias', 'default'),
                 FunctionVersion=lr['Version'],  # use the version of just published function
                 Description='Points to the latest version'
             )
@@ -207,6 +208,7 @@ class GroupCommands(object):
 
         log.debug("Function definition list ready:\n{0}".format(pretty(functions)))
 
+        # TODO: save function definition version under function definition
         log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
         fd = self._gg.create_function_definition(
             Name=self.name + '_func_def_1',
@@ -251,6 +253,76 @@ class GroupCommands(object):
 
         self.state.pop('Lambdas')
         _update_state(self.state)
+
+    def create_subscriptions(self):
+        if self.state and self.state.get('Subscriptions'):
+            log.warning("Previously created Subscriptions exists. Remove before creating!")
+            return
+        # MAYBE: don't create subscription before devices and lambdas?
+
+        subs = []
+        for i, s in enumerate(self.group['Subscriptions']):
+            log.debug("Subscription '{0}' - '{1}': {2}->{3}'".format(
+                i, s['Subject'], s['Source'], s['Target']))
+            subs.append({
+                'Id': str(i),
+                'Source': self._resolve_subscription_destination(s['Source']),
+                'Target': self._resolve_subscription_destination(s['Target']),
+                'Subject': s['Subject']
+            })
+        # pretty(subs)
+
+        log.info("Creating subscription definition: '{0}'".format(self.name + '_subscription'))
+        sub_def = self._gg.create_subscription_definition(
+            Name=self.name + '_subscription',
+            InitialVersion={'Subscriptions': subs}
+        )
+
+        self.state['Subscriptions'] = rinse(sub_def)
+        _update_state(self.state)
+
+        sub_def_ver = self._gg.get_subscription_definition_version(
+            SubscriptionDefinitionId=self.state['Subscriptions']['Id'],
+            SubscriptionDefinitionVersionId=self.state['Subscriptions']['LatestVersion'])
+
+        self.state['Subscriptions']['LatestVersionDetails'] = rinse(sub_def_ver)
+        _update_state(self.state)
+
+    def remove_subscriptions(self):
+        if not (self.state and self.state.get('Subscriptions')):
+            log.info("There seem to be nothing to remove.")
+            return
+
+        log.info("Deleting subscription definition '{0}' Id='{1}".format(
+            self.state['Subscriptions']['Name'], self.state['Subscriptions']['Id']))
+        self._gg.delete_subscription_definition(
+            SubscriptionDefinitionId=self.state['Subscriptions']['Id'])
+
+        self.state.pop('Subscriptions')
+        _update_state(self.state)
+
+    def _resolve_subscription_destination(self, d):
+        p = [x.strip() for x in d.split('::')]
+        if p[0] == 'cloud':
+            return p[0]
+        elif p[0] == 'Lambda':
+            return self._lookup_lambda_arn(p[1])
+        elif p[0] == 'Device':
+            return self._lookup_device_arn(p[1])
+        else:
+            raise ValueError("Error parsing subscription destination '{0}'. "
+                             "Allowed values: 'Lambda::', 'Device::', or 'cloud'.".format(d))
+
+    def _lookup_lambda_arn(self, name):
+        for l in self.state['Lambdas']:
+            if l['FunctionName'] == name:
+                # TODO: XXX: must be alias!!!
+                return l['FunctionArn'] + ':' + l['Version']
+        log.error("Lambda '{0}' not found".format(name))
+        return None
+
+    def _lookup_device_arn(self, name):
+        raise NotImplementedError("WIP: Devices not implemented yet.")
 
     def _create_cores(self):
         # TODO: Refactor-handle state internally, make callable individually
