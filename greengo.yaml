@@ -11,6 +11,7 @@ Lambdas:
   - name: GreengrassHelloWorld
     handler: function.handler
     package: lambdas/GreengrassHelloWorld
+    alias: dev
     # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use an existing role instead of auto-created one
     environment:
       foo: bar
@@ -29,10 +30,12 @@ Lambdas:
            name: value
 
 Subscriptions: # not implemented
-  - Id: 1
-    Source: ""
-    Subject: ""
-    Target: ""
+  - Source: Lambda::GreengrassHelloWorld
+    Subject: hello/world
+    Target: cloud
+  - Source: cloud
+    Subject: hello/world
+    Target: Lambda::GreengrassHelloWorld
 
 Devices: # not implemented
   - name: ml_take2_thing_1

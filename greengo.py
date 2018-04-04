@@ -10,8 +10,8 @@ from boto3.session import Session
 from botocore.exceptions import ClientError
 
 logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname)s: %(message)s',
-    level=logging.INFO)
+    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+    level=logging.WARNING)
 log = logging.getLogger('greengo')
 log.setLevel(logging.DEBUG)
 
@@ -69,14 +69,19 @@ class GroupCommands(object):
         # 3. Create Lambda functions and function definitions
         self.create_lambdas()
 
+        # 4. Create devices (coming soon)
+
+        # 5. Create subscriptions
+        self.create_subscriptions()
+
         # LAST. Add all the constituent parts to the Greengrass Group
         group_ver = self._gg.create_group_version(
             GroupId=self.state['Group']['Id'],
             CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
             # DeviceDefinitionVersionArn="",
             FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
+            SubscriptionDefinitionVersionArn=self.state['Subscriptions']['LatestVersionArn'],
             # LoggerDefinitionVersionArn="",
-            # SubscriptionDefinitionVersionArn=""
         )
 
         self.state['Group']['Version'] = rinse(group_ver)
@@ -131,6 +136,8 @@ class GroupCommands(object):
 
         log.info("[BEGIN] removing group {0}".format(self.group['Group']['name']))
 
+        self.remove_subscriptions()
+
         self._remove_cores()
 
         self.remove_lambdas()
@@ -145,20 +152,18 @@ class GroupCommands(object):
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
-    def create_lambdas(self):
-        if self.state and self.state.get('Lambdas'):
-            log.warning("Previously created Lambdas exists. Remove before creating!")
-            return
-
-        # TODO: Call only if needed: move under _create_default_lambda_role to call
+    def default_lambda_role_arn(self):
         if 'LambdaRole' not in self.state:
             log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
             role = self._create_default_lambda_role()
             self.state['LambdaRole'] = rinse(role)
             _update_state(self.state)
-            # Function creation immediately after role creation
-            # fails with "The role defined for the function cannot be assumed by Lambda."
-            sleep(10)
+        return self.state['LambdaRole']['Role']['Arn']
+
+    def create_lambdas(self):
+        if self.state and self.state.get('Lambdas'):
+            log.warning("Previously created Lambdas exists. Remove before creating!")
+            return
 
         functions = []
         self.state['Lambdas'] = []
@@ -167,45 +172,61 @@ class GroupCommands(object):
         for l in self.group['Lambdas']:
             log.info("Creating Lambda function '{0}'".format(l['name']))
 
-            role_arn = l['role'] if 'role' in l else self.state['LambdaRole']['Role']['Arn']
+            role_arn = l['role'] if 'role' in l else self.default_lambda_role_arn()
             log.info("Assuming role '{0}'".format(role_arn))
 
             zf = shutil.make_archive(
                 os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
             log.debug("Lambda deployment Zipped to '{0}'".format(zf))
 
-            with open(zf, 'rb') as f:
-                lr = self._lambda.create_function(
-                    FunctionName=l['name'],
-                    Runtime='python2.7',
-                    Role=role_arn,
-                    Handler=l['handler'],
-                    Code=dict(ZipFile=f.read()),
-                    Environment=dict(Variables=l.get('environment', {})),
-                    Publish=True
-                )
+            for retry in range(3):
+                try:
+                    with open(zf, 'rb') as f:
+                        lr = self._lambda.create_function(
+                            FunctionName=l['name'],
+                            Runtime='python2.7',
+                            Role=role_arn,
+                            Handler=l['handler'],
+                            Code=dict(ZipFile=f.read()),
+                            Environment=dict(Variables=l.get('environment', {})),
+                            Publish=True
+                        )
+                        # Break from retry cycle if lambda is created
+                        break
+                except ClientError as e:  # Catch the right exception
+                    if "The role defined for the function cannot be assumed by Lambda" in str(e):
+                        # Function creation immediately after role creation fails with
+                        # "The role defined for the function cannot be assumed by Lambda."
+                        # See StackOverflow https://goo.gl/eTfqsS
+                        log.warning("We hit AWS bug: the role is not yet propogated."
+                                    "Taking 10 sec nap")
+                        sleep(10)
+                        continue
+                    else:
+                        raise(e)
 
             lr['ZipPath'] = zf
             self.state['Lambdas'].append(rinse(lr))
             _update_state(self.state)
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
 
+            # Auto-created alias uses the version of just published function
             alias = self._lambda.create_alias(
                 FunctionName=lr['FunctionName'],
-                Name='latest',
-                FunctionVersion=lr['Version'],  # use the version of just published function
-                Description='Points to the latest version'
+                Name=l.get('alias', 'default'),
+                FunctionVersion=lr['Version'],
+                Description='Created by greengo'
             )
             log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
                 alias['FunctionVersion'], alias['AliasArn']))
 
             functions.append({
-                'Id': l['name'].lower(),
+                'Id': l['name'],
                 'FunctionArn': alias['AliasArn'],
                 'FunctionConfiguration': l['greengrassConfig']
             })
 
-        log.debug("Function definition list ready:\n{0}".format(pretty(functions)))
+        log.debug("Function definition list ready:\n{0}".format(functions))
 
         log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
         fd = self._gg.create_function_definition(
@@ -215,17 +236,19 @@ class GroupCommands(object):
         self.state['FunctionDefinition'] = rinse(fd)
         _update_state(self.state)
 
+        fd_ver = self._gg.get_function_definition_version(
+            FunctionDefinitionId=self.state['FunctionDefinition']['Id'],
+            FunctionDefinitionVersionId=self.state['FunctionDefinition']['LatestVersion'])
+
+        self.state['FunctionDefinition']['LatestVersionDetails'] = rinse(fd_ver)
+        _update_state(self.state)
+
         log.info("Lambdas and function definition created OK!")
 
         # TODO: Update group version if group exists
-        # group_ver = self._gg.create_group_version(
-        #     GroupId=group['Id'],
-        #     CoreDefinitionVersionArn=core_def['LatestVersionArn'],
-        #     # DeviceDefinitionVersionArn="",
-        #     FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
-        #     # LoggerDefinitionVersionArn="",
-        #     # SubscriptionDefinitionVersionArn=""
-        # )
+        #       This must happen on adding/removing/updating of anything
+        #       and shall update state['Group']['Version']
+        #       Extra method here.
 
     def remove_lambdas(self):
         if not (self.state and self.state.get('Lambdas')):
@@ -251,6 +274,81 @@ class GroupCommands(object):
 
         self.state.pop('Lambdas')
         _update_state(self.state)
+
+        log.info("Lambdas and function definition deleted OK!")
+
+    def create_subscriptions(self):
+        if self.state and self.state.get('Subscriptions'):
+            log.warning("Previously created Subscriptions exists. Remove before creating!")
+            return
+        # MAYBE: don't create subscription before devices and lambdas?
+
+        subs = []
+        for i, s in enumerate(self.group['Subscriptions']):
+            log.debug("Subscription '{0}' - '{1}': {2}->{3}'".format(
+                i, s['Subject'], s['Source'], s['Target']))
+            subs.append({
+                'Id': str(i),
+                'Source': self._resolve_subscription_destination(s['Source']),
+                'Target': self._resolve_subscription_destination(s['Target']),
+                'Subject': s['Subject']
+            })
+        log.debug("Subscription list is ready:\n{0}".format(pretty(subs)))
+
+        log.info("Creating subscription definition: '{0}'".format(self.name + '_subscription'))
+        sub_def = self._gg.create_subscription_definition(
+            Name=self.name + '_subscription',
+            InitialVersion={'Subscriptions': subs}
+        )
+
+        self.state['Subscriptions'] = rinse(sub_def)
+        _update_state(self.state)
+
+        sub_def_ver = self._gg.get_subscription_definition_version(
+            SubscriptionDefinitionId=self.state['Subscriptions']['Id'],
+            SubscriptionDefinitionVersionId=self.state['Subscriptions']['LatestVersion'])
+
+        self.state['Subscriptions']['LatestVersionDetails'] = rinse(sub_def_ver)
+        _update_state(self.state)
+
+        log.info("Subscription definition created OK!")
+
+    def remove_subscriptions(self):
+        if not (self.state and self.state.get('Subscriptions')):
+            log.info("There seem to be nothing to remove.")
+            return
+
+        log.info("Deleting subscription definition '{0}' Id='{1}".format(
+            self.state['Subscriptions']['Name'], self.state['Subscriptions']['Id']))
+        self._gg.delete_subscription_definition(
+            SubscriptionDefinitionId=self.state['Subscriptions']['Id'])
+
+        self.state.pop('Subscriptions')
+        _update_state(self.state)
+        log.info("Subscription definition deleted OK!")
+
+    def _resolve_subscription_destination(self, d):
+        p = [x.strip() for x in d.split('::')]
+        if p[0] == 'cloud':
+            return p[0]
+        elif p[0] == 'Lambda':
+            return self._lookup_lambda_qualified_arn(p[1])
+        elif p[0] == 'Device':
+            return self._lookup_device_arn(p[1])
+        else:
+            raise ValueError("Error parsing subscription destination '{0}'. "
+                             "Allowed values: 'Lambda::', 'Device::', or 'cloud'.".format(d))
+
+    def _lookup_lambda_qualified_arn(self, name):
+        details = self.state['FunctionDefinition']['LatestVersionDetails']
+        for l in details['Definition']['Functions']:
+            if l['Id'] == name:
+                return l['FunctionArn']
+        log.error("Lambda '{0}' not found".format(name))
+        return None
+
+    def _lookup_device_arn(self, name):
+        raise NotImplementedError("WIP: Devices not implemented yet.")
 
     def _create_cores(self):
         # TODO: Refactor-handle state internally, make callable individually
