@@ -20,6 +20,8 @@ DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
 STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
 
+DEPLOY_TIMEOUT = 45  # Timeout, seconds
+
 
 class GroupCommands(object):
     def __init__(self):
@@ -103,7 +105,7 @@ class GroupCommands(object):
         self.state['Deployment'] = rinse(deployment)
         _update_state(self.state)
 
-        for i in range(15):
+        for i in range(DEPLOY_TIMEOUT / 2):
             sleep(2)
             deployment_status = self._gg.get_deployment_status(
                 GroupId=self.state['Group']['Id'],
