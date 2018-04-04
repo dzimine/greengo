@@ -246,14 +246,9 @@ class GroupCommands(object):
         log.info("Lambdas and function definition created OK!")
 
         # TODO: Update group version if group exists
-        # group_ver = self._gg.create_group_version(
-        #     GroupId=group['Id'],
-        #     CoreDefinitionVersionArn=core_def['LatestVersionArn'],
-        #     # DeviceDefinitionVersionArn="",
-        #     FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
-        #     # LoggerDefinitionVersionArn="",
-        #     # SubscriptionDefinitionVersionArn=""
-        # )
+        #       This must happen on adding/removing/updating of anything
+        #       and shall update state['Group']['Version']
+        #       Extra method here.
 
     def remove_lambdas(self):
         if not (self.state and self.state.get('Lambdas')):
@@ -337,20 +332,18 @@ class GroupCommands(object):
         if p[0] == 'cloud':
             return p[0]
         elif p[0] == 'Lambda':
-            return self._lookup_lambda_arn(p[1])
+            return self._lookup_lambda_qualified_arn(p[1])
         elif p[0] == 'Device':
             return self._lookup_device_arn(p[1])
         else:
             raise ValueError("Error parsing subscription destination '{0}'. "
                              "Allowed values: 'Lambda::', 'Device::', or 'cloud'.".format(d))
 
-    def _lookup_lambda_arn(self, name):
-        # MAYBE: write 'Lambdas' as map for a better lookup?
-        #        Or: look up in function definitions function list 'LatestVersionDetails'
-        for l in self.state['Lambdas']:
-            if l['FunctionName'] == name:
-                # TODO:: must be alias!!!
-                return l['FunctionArn'] + ':' + self.group['alias']
+    def _lookup_lambda_qualified_arn(self, name):
+        details = self.state['FunctionDefinition']['LatestVersionDetails']
+        for l in details['Definition']['Functions']:
+            if l['Id'] == name:
+                return l['FunctionArn']
         log.error("Lambda '{0}' not found".format(name))
         return None
 
