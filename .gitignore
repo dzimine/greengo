@@ -3,3 +3,5 @@
 certs/**
 config/**
 venv
+*.pyc
+__pycache__/**
