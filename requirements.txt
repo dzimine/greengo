@@ -2,3 +2,4 @@ fire
 boto3
 botocore
 pyyaml
+pytest
