@@ -1,0 +1,161 @@
+{
+  "CoreDefinition": {
+    "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/cores/d58c6108-2565-4c0c-b0d7-9832751fb484",
+    "CreationTimestamp": "2018-04-04T09:21:29.195Z",
+    "Id": "d58c6108-2565-4c0c-b0d7-9832751fb484",
+    "LastUpdatedTimestamp": "2018-04-04T09:21:29.195Z",
+    "LatestVersion": "46e287bc-dbce-41e3-8254-b983e920a1f4",
+    "LatestVersionArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/cores/d58c6108-2565-4c0c-b0d7-9832751fb484/versions/46e287bc-dbce-41e3-8254-b983e920a1f4",
+    "Name": "GreengoGroup_core_def"
+  },
+  "Cores": [
+    {
+      "keys": {
+        "certificateArn": "arn:aws:iot:us-west-2:000000000000:cert/7f8b7783887d381c79e5f07db930523ded0bff037dd91b99db802383b1a78d88",
+        "certificateId": "7f8b7783887d381c79e5f07db930523ded0bff037dd91b99db802383b1a78d88",
+        "certificatePem": "-----BEGIN CERTIFICATE-----\nPEMxxxXXXXXXXXXXXXXXXXXXXXXX==\n-----END CERTIFICATE-----\n",
+        "keyPair": {
+          "PrivateKey": "-----BEGIN RSA PRIVATE KEY-----\nPRIVATEKEYxxxXXXXXXXXXXXXXXXXXXXXXX=\n-----END RSA PRIVATE KEY-----\n",
+          "PublicKey": "-----BEGIN PUBLIC KEY-----\nPUBLICKEYxxxXXXXXXXXXXXXXXXXXXXXXX-----END PUBLIC KEY-----\n"
+        }
+      },
+      "name": "GreengoGroup_core_1",
+      "policy": {
+        "policyArn": "arn:aws:iot:us-west-2:000000000000:policy/GreengoGroup_core_1-policy",
+        "policyDocument": "{\"Version\": \"2012-10-17\", \"Statement\": [{\"Action\": [\"iot:Publish\", \"iot:Subscribe\", \"iot:Connect\", \"iot:Receive\", \"iot:GetThingShadow\", \"iot:DeleteThingShadow\", \"iot:UpdateThingShadow\"], \"Resource\": [\"arn:aws:iot:us-west-2:*:*\"], \"Effect\": \"Allow\"}, {\"Action\": [\"greengrass:AssumeRoleForGroup\", \"greengrass:CreateCertificate\", \"greengrass:GetConnectivityInfo\", \"greengrass:GetDeployment\", \"greengrass:GetDeploymentArtifacts\", \"greengrass:UpdateConnectivityInfo\", \"greengrass:UpdateCoreDeploymentStatus\"], \"Resource\": [\"*\"], \"Effect\": \"Allow\"}]}",
+        "policyName": "GreengoGroup_core_1-policy",
+        "policyVersionId": "1"
+      },
+      "thing": {
+        "thingArn": "arn:aws:iot:us-west-2:000000000000:thing/GreengoGroup_core_1",
+        "thingId": "c4a78361-b67a-4b5c-bdf8-2ebf1d749e1f",
+        "thingName": "GreengoGroup_core_1"
+      }
+    }
+  ],
+  "FunctionDefinition": {
+    "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/functions/3164383a-7c4c-4533-8fad-a6a451052a4d",
+    "CreationTimestamp": "2018-04-04T09:21:44.721Z",
+    "Id": "3164383a-7c4c-4533-8fad-a6a451052a4d",
+    "LastUpdatedTimestamp": "2018-04-04T09:21:44.721Z",
+    "LatestVersion": "731186cb-d46e-4ea8-b97f-edfd59600369",
+    "LatestVersionArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/functions/3164383a-7c4c-4533-8fad-a6a451052a4d/versions/731186cb-d46e-4ea8-b97f-edfd59600369",
+    "LatestVersionDetails": {
+      "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/functions/3164383a-7c4c-4533-8fad-a6a451052a4d/versions/731186cb-d46e-4ea8-b97f-edfd59600369",
+      "CreationTimestamp": "2018-04-04T09:21:44.721Z",
+      "Definition": {
+        "Functions": [
+          {
+            "FunctionArn": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassHelloWorld:dev",
+            "FunctionConfiguration": {
+              "Environment": {
+                "AccessSysfs": false,
+                "Variables": {
+                  "name": "value"
+                }
+              },
+              "MemorySize": 128000,
+              "Pinned": true,
+              "Timeout": 10
+            },
+            "Id": "GreengrassHelloWorld"
+          }
+        ]
+      },
+      "Id": "3164383a-7c4c-4533-8fad-a6a451052a4d",
+      "Version": "731186cb-d46e-4ea8-b97f-edfd59600369"
+    },
+    "Name": "GreengoGroup_func_def_1"
+  },
+  "Group": {
+    "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/groups/384ddf6c-f562-48bd-b106-45209ba0a89e",
+    "CreationTimestamp": "2018-04-04T09:21:25.978Z",
+    "Id": "384ddf6c-f562-48bd-b106-45209ba0a89e",
+    "LastUpdatedTimestamp": "2018-04-04T09:21:25.978Z",
+    "Name": "GreengoGroup",
+    "Version": {
+      "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/groups/384ddf6c-f562-48bd-b106-45209ba0a89e/versions/db511c52-fcc9-495c-8dc3-c703736939db",
+      "CreationTimestamp": "2018-04-04T09:21:47.377Z",
+      "Id": "384ddf6c-f562-48bd-b106-45209ba0a89e",
+      "Version": "db511c52-fcc9-495c-8dc3-c703736939db"
+    }
+  },
+  "LambdaRole": {
+    "Role": {
+      "Arn": "arn:aws:iam::000000000000:role/GreengoGroup_Lambda_Role",
+      "AssumeRolePolicyDocument": {
+        "Statement": [
+          {
+            "Action": "sts:AssumeRole",
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "lambda.amazonaws.com"
+            }
+          }
+        ],
+        "Version": "2012-10-17"
+      },
+      "CreateDate": "2018-04-04 09:21:29.979000+00:00",
+      "Path": "/",
+      "RoleId": "AROAJXSCI44V4FPDVM7UK",
+      "RoleName": "GreengoGroup_Lambda_Role"
+    }
+  },
+  "Lambdas": [
+    {
+      "CodeSha256": "zOSLlGYEOXjWfJ9iNFQTu7e7dcfqOOWwI3vkcxbMwoU=",
+      "CodeSize": 33260,
+      "Description": "",
+      "Environment": {
+        "Variables": {
+          "foo": "bar"
+        }
+      },
+      "FunctionArn": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassHelloWorld",
+      "FunctionName": "GreengrassHelloWorld",
+      "Handler": "function.handler",
+      "LastModified": "2018-04-04T09:21:43.430+0000",
+      "MemorySize": 128,
+      "RevisionId": "82127cda-ee1c-4c90-80eb-3ae0e97e0115",
+      "Role": "arn:aws:iam::000000000000:role/GreengoGroup_Lambda_Role",
+      "Runtime": "python2.7",
+      "Timeout": 3,
+      "TracingConfig": {
+        "Mode": "PassThrough"
+      },
+      "Version": "21",
+      "ZipPath": "/path/to/greengo/.gg/GreengrassHelloWorld.zip"
+    }
+  ],
+  "Subscriptions": {
+    "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/subscriptions/37d25372-c98e-4435-978d-756b14a11911",
+    "CreationTimestamp": "2018-04-04T09:21:46.234Z",
+    "Id": "37d25372-c98e-4435-978d-756b14a11911",
+    "LastUpdatedTimestamp": "2018-04-04T09:21:46.234Z",
+    "LatestVersion": "2e73b2cc-d8d0-4713-9f72-08240429b55b",
+    "LatestVersionArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/subscriptions/37d25372-c98e-4435-978d-756b14a11911/versions/2e73b2cc-d8d0-4713-9f72-08240429b55b",
+    "LatestVersionDetails": {
+      "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/subscriptions/37d25372-c98e-4435-978d-756b14a11911/versions/2e73b2cc-d8d0-4713-9f72-08240429b55b",
+      "CreationTimestamp": "2018-04-04T09:21:46.234Z",
+      "Definition": {
+        "Subscriptions": [
+          {
+            "Id": "0",
+            "Source": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassHelloWorld:dev",
+            "Subject": "hello/world",
+            "Target": "cloud"
+          },
+          {
+            "Id": "1",
+            "Source": "cloud",
+            "Subject": "hello/world",
+            "Target": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassHelloWorld:dev"
+          }
+        ]
+      },
+      "Id": "37d25372-c98e-4435-978d-756b14a11911",
+      "Version": "2e73b2cc-d8d0-4713-9f72-08240429b55b"
+    },
+    "Name": "GreengoGroup_subscription"
+  }
+}

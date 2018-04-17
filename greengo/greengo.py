@@ -6,7 +6,7 @@ import yaml
 import shutil
 from time import sleep
 import logging
-from boto3.session import Session
+from boto3 import session
 from botocore.exceptions import ClientError
 
 logging.basicConfig(
@@ -27,12 +27,14 @@ class GroupCommands(object):
     def __init__(self):
         super(GroupCommands, self).__init__()
 
-        session = Session()
-        self._gg = session.client("greengrass")
-        self._iot = session.client("iot")
-        self._lambda = session.client("lambda")
-        self._iam = session.client("iam")
-        self._region = session.region_name
+        s = session.Session()
+        self._region = s.region_name
+        log.info("AWS credentials found for region '{}'".format(self._region))
+
+        self._gg = s.client("greengrass")
+        self._iot = s.client("iot")
+        self._lambda = s.client("lambda")
+        self._iam = s.client("iam")
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
         with open(DEFINITION_FILE, 'r') as f:
