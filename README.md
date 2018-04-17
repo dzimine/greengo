@@ -1,6 +1,7 @@
 # Boilerplate for AWS IoT Greengrass
 
-A starter project to bring up (and clean-up!) AWS Greengrass setup for play and profit. If you followed the [GreenGrass Getting Started Guide](https://docs.aws.amazon.com/greengrass/latest/developerguide/gg-gs.html), here you find it automated, as code.
+
+<img src="./misc/greengo.png?raw=true" width="50px"> Greengo: a starter project to bring up (and clean-up!) AWS Greengrass setup for play and profit. If you followed the [GreenGrass Getting Started Guide](https://docs.aws.amazon.com/greengrass/latest/developerguide/gg-gs.html), here you find it automated, as code.
 
 > Work In Progress !
 
