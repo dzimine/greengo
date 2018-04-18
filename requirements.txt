@@ -3,3 +3,4 @@ boto3
 botocore
 pyyaml
 pytest
+mock
