@@ -30,8 +30,8 @@ class GroupCommands(object):
         s = session.Session()
         self._region = s.region_name
         if not self._region:
-            log.error("AWS credentials and region must be setup."
-                "Refer AWS docs at https://goo.gl/JDi5ie")
+            log.error("AWS credentials and region must be setup. "
+                      "Refer AWS docs at https://goo.gl/JDi5ie")
             exit(-1)
 
         log.info("AWS credentials found for region '{}'".format(self._region))
@@ -42,8 +42,14 @@ class GroupCommands(object):
         self._iam = s.client("iam")
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
-        with open(DEFINITION_FILE, 'r') as f:
-            self.group = self.group = yaml.safe_load(f)
+        try:
+            with open(DEFINITION_FILE, 'r') as f:
+                self.group = self.group = yaml.safe_load(f)
+        except IOError:
+            log.error("Group definition file `greengo.yaml` not found. "
+                      "Create file, and define the group definition first. "
+                      "See https://github.com/greengo for details.")
+            exit(-1)
 
         self.name = self.group['Group']['name']
         self._LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
