@@ -19,19 +19,10 @@ Inspired by [aws-iot-elf (Extremely Low Friction)](https://github.com/awslabs/aw
 
 ## Set it Up
 
-Clone the repo:
+Install `greengo` from PyPI:
 
 ```
-git clone https://github.com/dzimine/greengo
-cd greengo
-```
-
-Create and activate a virtual environment, install the dependencies
-
-```
-virtualenv venv
-source ~/dev/aws-iot-elf/venv/bin/activate
-pip install -r requirements.txt
+$ pip install greengo
 ```
 
 Manually [*] download GreenGrassCore binary and place it in the `./downloads` directory.
@@ -39,7 +30,7 @@ Sign in to the AWS Management Console, navigate to the AWS IoT console,
 and download the AWS Greengrass
 Core Software from [Software section](https://us-west-2.console.aws.amazon.com/iotv2/home?region=us-west-2#/
 software/greengrass).
-Yeah this sucks... I will automate it later. In the meantime, PR is most welcome!
+Yeah, manual sucks... I will automate it later. Or, submit your PR!
 
 
 ## Play
@@ -49,7 +40,7 @@ Yeah this sucks... I will automate it later. In the meantime, PR is most welcome
     Fancy yourself with the group definitions in `group.yaml`, and run `greengo`:
 
     ```
-    python greengo/greengo.py create
+    $ greengo create
     ```
     When runs with no errors, it creates all greengrass group artefacts on AWS
     and places certificates and `config.json` for GreenGrass Core in `./certs`
@@ -59,13 +50,13 @@ Yeah this sucks... I will automate it later. In the meantime, PR is most welcome
 2. Provision VM with GreenGrass Core with Vagrant
 
     ```
-    vagrant up
+    $ vagrant up
     ```
 
 3. Deploy Greengrass Group to the Core on the VM. 
 
     ```
-    python greengo/greengo.py deploy
+    $ greengo deploy
     ```
 4. Check that everything works - see the ["Check" section](#check-the-deployment)  below.
 
@@ -76,13 +67,13 @@ Yeah this sucks... I will automate it later. In the meantime, PR is most welcome
     Remove the group definitions on AWS:
 
     ```
-    python greengo/greengo.py remove
+    $ greengo remove
     ```
 
     Ditch the Vagrant VM:
 
     ```
-    vagrant destroy
+    $ vagrant destroy
     ```
 
 > NOTE: If you want to create a new group but keep the Greengrass Core in the same Vagrant VM,
@@ -92,9 +83,9 @@ Yeah this sucks... I will automate it later. In the meantime, PR is most welcome
 > 
 > To do it: login to the Greengrass Vagrant VM and run `/vagrant/scripts/update_ggc.sh` on the Vagrant VM.
 
-# Details
+## Details
 
-## Check the deployment
+### Check the deployment
 How to be sure ~~everything~~ something works? Follow this:
 
 1. Create greengrass group in AWS IoT: `greengo create`.
@@ -118,7 +109,7 @@ How to be sure ~~everything~~ something works? Follow this:
     Subscribe to the topic (e.g., `hello/world`), see the messages sent by the Greengrass Lambda function.
 
 
-# When something goes wrong
+### When something goes wrong
 At this time `greengo` is just a prototype, a work-in-progress. Therefore it's not *if* but *when* somethings throws out, leaving the setup in half-deployed,
 and you gotta pick up the pieces. Remember:
 
@@ -129,3 +120,22 @@ and `Id` of all resources to clean-up.
 
 Please pay forward: PR a patch to whatever broke for you to prevent it from happening again.
 
+## Development
+
+Clone the project, set up your environment, install dependencies and setup `greengo` CLI in dev mode:
+
+```
+$ git clone https://github.com/dzimine/greengo.git
+$ cd greengo
+$ virtualenv venv
+
+$ . venv/bin/activate
+$ pip install -r requirements.txt
+$ pip install -e .
+```
+
+Run the unit tests:
+
+```
+pytest -s
+```
