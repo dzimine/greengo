@@ -29,6 +29,11 @@ class GroupCommands(object):
 
         s = session.Session()
         self._region = s.region_name
+        if not self._region:
+            log.error("AWS credentials and region must be setup."
+                "Refer AWS docs at https://goo.gl/JDi5ie")
+            exit(-1)
+
         log.info("AWS credentials found for region '{}'".format(self._region))
 
         self._gg = s.client("greengrass")
@@ -41,7 +46,7 @@ class GroupCommands(object):
             self.group = self.group = yaml.safe_load(f)
 
         self.name = self.group['Group']['name']
-        self.LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
+        self._LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
 
         _mkdir(MAGIC_DIR)
         self.state = _load_state()
@@ -156,9 +161,9 @@ class GroupCommands(object):
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
-    def default_lambda_role_arn(self):
+    def _default_lambda_role_arn(self):
         if 'LambdaRole' not in self.state:
-            log.info("Creating default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+            log.info("Creating default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
             role = self._create_default_lambda_role()
             self.state['LambdaRole'] = rinse(role)
             _update_state(self.state)
@@ -176,7 +181,7 @@ class GroupCommands(object):
         for l in self.group['Lambdas']:
             log.info("Creating Lambda function '{0}'".format(l['name']))
 
-            role_arn = l['role'] if 'role' in l else self.default_lambda_role_arn()
+            role_arn = l['role'] if 'role' in l else self._default_lambda_role_arn()
             log.info("Assuming role '{0}'".format(role_arn))
 
             zf = shutil.make_archive(
@@ -266,7 +271,7 @@ class GroupCommands(object):
         self.state.pop('FunctionDefinition')
         _update_state(self.state)
 
-        log.info("Deleting default lambda role '{0}'".format(self.LAMBDA_ROLE_NAME))
+        log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
         self._remove_default_lambda_role()
         self.state.pop('LambdaRole')
         _update_state(self.state)
@@ -554,7 +559,7 @@ class GroupCommands(object):
         }
 
         role = self._iam.create_role(
-            RoleName=self.LAMBDA_ROLE_NAME,
+            RoleName=self._LAMBDA_ROLE_NAME,
             AssumeRolePolicyDocument=json.dumps(role_policy_document)
         )
 
@@ -574,18 +579,18 @@ class GroupCommands(object):
         }
 
         self._iam.put_role_policy(
-            RoleName=self.LAMBDA_ROLE_NAME,
-            PolicyName=self.LAMBDA_ROLE_NAME + "-Policy",
+            RoleName=self._LAMBDA_ROLE_NAME,
+            PolicyName=self._LAMBDA_ROLE_NAME + "-Policy",
             PolicyDocument=json.dumps(inline_policy))
 
         return role
 
     def _remove_default_lambda_role(self):
 
-        for p in self._iam.list_role_policies(RoleName=self.LAMBDA_ROLE_NAME)['PolicyNames']:
-            self._iam.delete_role_policy(RoleName=self.LAMBDA_ROLE_NAME, PolicyName=p)
+        for p in self._iam.list_role_policies(RoleName=self._LAMBDA_ROLE_NAME)['PolicyNames']:
+            self._iam.delete_role_policy(RoleName=self._LAMBDA_ROLE_NAME, PolicyName=p)
 
-        self._iam.delete_role(RoleName=self.LAMBDA_ROLE_NAME)
+        self._iam.delete_role(RoleName=self._LAMBDA_ROLE_NAME)
 
 ###############################################################################
 # UTILITY FUNCTIONS
