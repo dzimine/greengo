@@ -1,6 +1,7 @@
 from setuptools import setup
 from codecs import open
 from os import path
+from greengo import __version__
 
 here = path.abspath(path.dirname(__file__))
 
@@ -9,7 +10,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='greengo',
-    version='0.1.4',
+    version=__version__,
     description='AWS Greengrass file-based setup tool',
     long_description=long_description,
     long_description_content_type='text/markdown',
