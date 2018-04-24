@@ -55,7 +55,7 @@ class GroupCommands(object):
         self._LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
 
         _mkdir(MAGIC_DIR)
-        self.state = _load_state()
+        self.state = State(_load_state())
 
     def create(self):
         if self.state:
@@ -90,17 +90,7 @@ class GroupCommands(object):
         self.create_subscriptions()
 
         # LAST. Add all the constituent parts to the Greengrass Group
-        group_ver = self._gg.create_group_version(
-            GroupId=self.state['Group']['Id'],
-            CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
-            # DeviceDefinitionVersionArn="",
-            FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
-            SubscriptionDefinitionVersionArn=self.state['Subscriptions']['LatestVersionArn'],
-            # LoggerDefinitionVersionArn="",
-        )
-
-        self.state['Group']['Version'] = rinse(group_ver)
-        _update_state(self.state)
+        self._create_group_version()
 
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
@@ -144,6 +134,26 @@ class GroupCommands(object):
             "Make sure GreenGrass Core is running, connected to network, "
             "and the certificates match.")
 
+    def create_group_version(self):
+        kwargs = dict(
+            GroupId=self.state['Group']['Id'],
+            CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
+            DeviceDefinitionVersionArn="",
+            FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
+            SubscriptionDefinitionVersionArn=self.state['Subscriptions']['LatestVersionArn'],
+            LoggerDefinitionVersionArn="",
+        )
+
+        args = dict((k, v) for k, v in kwargs.iteritems() if v)
+
+        log.debug("Creating group version with settings:\n{0}".format(pretty(args)))
+
+        group_ver = self._gg.create_group_version(**args)
+
+        self.state['Group']['Version'] = rinse(group_ver)
+        _update_state(self.state)
+        return group_ver
+
     def remove(self):
         if not self.state:
             log.info("There seem to be nothing to remove.")
@@ -176,6 +186,10 @@ class GroupCommands(object):
         return self.state['LambdaRole']['Role']['Arn']
 
     def create_lambdas(self):
+        if not self.group.get('Lambdas'):
+            log.info("Subscriptions not defined. Moving on...")
+            return
+
         if self.state and self.state.get('Lambdas'):
             log.warning("Previously created Lambdas exists. Remove before creating!")
             return
@@ -241,7 +255,7 @@ class GroupCommands(object):
                 'FunctionConfiguration': l['greengrassConfig']
             })
 
-        log.debug("Function definition list ready:\n{0}".format(functions))
+        log.debug("Function definition list ready:\n{0}".format(pretty(functions)))
 
         log.info("Creating function definition: '{0}'".format(self.name + '_func_def_1'))
         fd = self._gg.create_function_definition(
@@ -270,12 +284,15 @@ class GroupCommands(object):
             log.info("There seem to be nothing to remove.")
             return
 
-        log.info("Deleting function definition '{0}' Id='{1}".format(
-            self.state['FunctionDefinition']['Name'], self.state['FunctionDefinition']['Id']))
-        self._gg.delete_function_definition(
-            FunctionDefinitionId=self.state['FunctionDefinition']['Id'])
-        self.state.pop('FunctionDefinition')
-        _update_state(self.state)
+        if not self.state.get('FunctionDefinition'):
+            log.warning("Function definition was not created. Moving on...")
+        else:
+            log.info("Deleting function definition '{0}' Id='{1}".format(
+                self.state['FunctionDefinition']['Name'], self.state['FunctionDefinition']['Id']))
+            self._gg.delete_function_definition(
+                FunctionDefinitionId=self.state['FunctionDefinition']['Id'])
+            self.state.pop('FunctionDefinition')
+            _update_state(self.state)
 
         log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
         self._remove_default_lambda_role()
@@ -293,6 +310,10 @@ class GroupCommands(object):
         log.info("Lambdas and function definition deleted OK!")
 
     def create_subscriptions(self):
+        if not self.group.get('Subscriptions'):
+            log.info("Subscriptions not defined. Moving on...")
+            return
+
         if self.state and self.state.get('Subscriptions'):
             log.warning("Previously created Subscriptions exists. Remove before creating!")
             return
@@ -592,7 +613,6 @@ class GroupCommands(object):
         return role
 
     def _remove_default_lambda_role(self):
-
         for p in self._iam.list_role_policies(RoleName=self._LAMBDA_ROLE_NAME)['PolicyNames']:
             self._iam.delete_role_policy(RoleName=self._LAMBDA_ROLE_NAME, PolicyName=p)
 
@@ -608,8 +628,8 @@ def rinse(boto_response):
 
 
 def pretty(d):
-    """Pretty-print object as YAML."""
-    print(yaml.safe_dump(d, default_flow_style=False))
+    """Pretty object as YAML."""
+    return yaml.safe_dump(d, default_flow_style=False)
 
 
 def _update_state(group_state):
@@ -624,6 +644,13 @@ def _update_state(group_state):
         log.debug("Updated group state in state file '{0}'".format(STATE_FILE))
 
 
+class State(dict):
+
+    def __missing__(self, k):  # noqa
+        v = self[k] = type(self)()
+        return v
+
+
 def _state_exists():
     return os.path.exists(STATE_FILE)
 
@@ -634,7 +661,7 @@ def _load_state():
         return {}
     log.debug("Loading group state from {0}".format(STATE_FILE))
     with open(STATE_FILE, 'r') as f:
-        return json.load(f)
+        return State(json.load(f))
 
 
 def _mkdir(path):
