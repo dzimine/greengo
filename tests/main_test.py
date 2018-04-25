@@ -75,7 +75,6 @@ class GroupCommandTest(unittest.TestCase):
 
         self.gg.remove_subscriptions()
         self.assertFalse(self.gg.state.get('Subscriptions'), "Subscriptions shall be removed")
-        greengo.pretty(state['Subscriptions'])
 
     def test_create_group_version_fullset(self):
         self.gg.state = greengo.State(state.copy())
@@ -85,7 +84,7 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.create_group_version()
 
         args, kwargs = m.call_args
-        self.assertEqual(len(kwargs), 4)  # TODO: Refine expected kwarg count
+        self.assertEqual(len(kwargs), 5)  # TODO: Refine expected kwarg count
 
     def test_create_group_version_subset(self):
         self.gg.state = greengo.State(state.copy())
@@ -97,7 +96,18 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.create_group_version()
 
         args, kwargs = m.call_args
-        self.assertEqual(len(kwargs), 2)  # TODO: Refine expected kwarg count
+        self.assertEqual(len(kwargs), 3)  # TODO: Refine expected kwarg count
+
+    def test_create_resources(self):
+        self.gg.group.pop('Resources')
+        self.gg.create_resources()
+
+    def test_remove_resources(self):
+        self.gg._gg.delete_resource_definition = MagicMock(return_value=state['Resources'])
+        self.gg.state = greengo.State(state.copy())
+
+        self.gg.remove_resources()
+        self.assertFalse(self.gg.state.get('Resources'), "Resources shall be removed")
 
 
 @patch('greengo.greengo.rinse', rinse)

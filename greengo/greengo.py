@@ -142,6 +142,7 @@ class GroupCommands(object):
             FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
             SubscriptionDefinitionVersionArn=self.state['Subscriptions']['LatestVersionArn'],
             LoggerDefinitionVersionArn="",
+            ResourceDefinitionVersionArn=self.state['Resources']['LatestVersionArn'],
         )
 
         args = dict((k, v) for k, v in kwargs.iteritems() if v)
@@ -319,6 +320,7 @@ class GroupCommands(object):
             return
         # MAYBE: don't create subscription before devices and lambdas?
 
+        log.debug("Preparing subscription list...")
         subs = []
         for i, s in enumerate(self.group['Subscriptions']):
             log.debug("Subscription '{0}' - '{1}': {2}->{3}'".format(
@@ -385,6 +387,58 @@ class GroupCommands(object):
 
     def _lookup_device_arn(self, name):
         raise NotImplementedError("WIP: Devices not implemented yet.")
+
+    def create_resources(self):
+        if not self.group.get('Resources'):
+            log.info("Resources not defined. Moving on...")
+            return
+
+        if self.state and self.state.get('Resources'):
+            log.warning("Previously created Resources exist. Remove before creating!")
+            return
+
+        log.debug("Preparing Resources ...")
+        res = []
+        for r in self.group['Resources']:
+            # Convert from a simplified form
+            resource = dict(Name=r.pop('Name'), Id=r.pop('Id'))
+            resource['ResourceDataContainer'] = r
+            res.append(resource)
+
+        log.debug("Resources list is ready:\n{0}".format(pretty(res)))
+
+        name = self.name + '_resources'
+        log.info("Creating resource definition: '{0}'".format(name))
+        res_def = self._gg.create_resource_definition(
+            Name=name,
+            InitialVersion={'Resources': res}
+        )
+
+        self.state['Resources'] = rinse(res_def)
+        _update_state(self.state)
+
+        res_def_ver = self._gg.get_resource_definition_version(
+            ResourceDefinitionId=self.state['Resources']['Id'],
+            ResourceDefinitionVersionId=self.state['Resources']['LatestVersion'])
+
+        self.state['Resources']['LatestVersionDetails'] = rinse(res_def_ver)
+        _update_state(self.state)
+
+        log.info("Resources definition created OK!")
+
+    def remove_resources(self):
+        if not (self.state and self.state.get('Resources')):
+            log.info("There seem to be nothing to remove.")
+            return
+
+        log.info("Deleting resources definition '{0}' Id='{1}".format(
+            self.state['Resources']['Name'], self.state['Resources']['Id']))
+        self._gg.delete_resource_definition(
+            ResourceDefinitionId=self.state['Resources']['Id'])
+
+        self.state.pop('Resources')
+        _update_state(self.state)
+        log.info("Resources definition deleted OK!")
 
     def _create_cores(self):
         # TODO: Refactor-handle state internally, make callable individually
