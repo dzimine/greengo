@@ -1,0 +1,112 @@
+{
+  "$Schema": null,
+  "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/groups/fcbbb334-fc8f-4de1-8516-80ee4a00af57/versions/526f58c0-85fe-428e-b96e-9e7787bc8f22",
+  "Version": null,
+  "Region": "us-west-2",
+  "Cores": [
+    {
+      "thingArn": "arn:aws:iot:us-west-2:000000000000:thing/ML_infer_core_1",
+      "certArn": "arn:aws:iot:us-west-2:000000000000:cert/d2357b4ec1cbe438e1339afc5b8259ec7247568f589102575818d15b850154fd"
+    }
+  ],
+  "Devices": [],
+  "GroupDefinitions": {
+    "Resources": {
+      "ref": null,
+      "Content": [
+        {
+          "Id": "9262fadd-49c8-4fb7-bba6-cc05c465e422",
+          "Type": "LOCAL_VOLUME",
+          "Data": {
+            "type": "LocalVolumeResourceData",
+            "SourcePath": "/images",
+            "DestinationPath": "/input",
+            "GroupOwnerSetting": {
+              "AutoAddGroupOwner": true
+            }
+          }
+        }
+      ]
+    },
+    "Lambdas": {
+      "ref": null,
+      "Content": [
+        {
+          "FunctionArn": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassImageClassification:4",
+          "ArtifactArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/groups/fcbbb334-fc8f-4de1-8516-80ee4a00af57/deployments/00e17354-23e4-451b-8106-9b307fee5841/artifacts/lambda/cc0ef34a-a3c4-4651-ba3f-a49cf6d0f925",
+          "DeploymentConfiguration": {
+            "Priority": 1,
+            "Pinned": true,
+            "CodeSha256": "In5ZyAflHEVwVTnJTliEx22PsiRB89isLl67prh5i0Y=",
+            "CodeSize": 4652147,
+            "Description": "",
+            "Handler": "run.handler",
+            "MemorySize": 128000,
+            "Timeout": 10,
+            "Runtime": "python2.7",
+            "Environment": {
+              "Variables": {
+                "WATCH_PATTERN": "/input/*.jpeg"
+              },
+              "ResourceAccessPolicies": [
+                {
+                  "ResourceId": "9262fadd-49c8-4fb7-bba6-cc05c465e422",
+                  "Permission": "rw"
+                }
+              ],
+              "AccessSysfs": false
+            }
+          }
+        },
+        {
+          "FunctionArn": "arn:aws:lambda:us-west-2:000000000000:function:HelloLongRunning:5",
+          "ArtifactArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/groups/fcbbb334-fc8f-4de1-8516-80ee4a00af57/deployments/00e17354-23e4-451b-8106-9b307fee5841/artifacts/lambda/4fe65b26-945c-467d-9811-e137b9b07f41",
+          "DeploymentConfiguration": {
+            "Priority": 1,
+            "Pinned": true,
+            "CodeSha256": "0sxFq3Q0w2upKVu0bHCZ5LzWtSVhk1zNBB4BAYKk/yk=",
+            "CodeSize": 673,
+            "Description": "",
+            "Handler": "function.handler",
+            "MemorySize": 128000,
+            "Timeout": 90,
+            "EncodingType": "json",
+            "Runtime": "python2.7",
+            "Environment": {
+              "Variables": {
+                "INTERVAL": "5"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Subscriptions": {
+      "ref": null,
+      "Content": []
+    },
+    "Logging": {
+      "Content": [
+        {
+          "Type": "FileSystem",
+          "Component": "GreengrassSystem",
+          "Level": "INFO",
+          "Space": 128
+        },
+        {
+          "Type": "FileSystem",
+          "Component": "Lambda",
+          "Level": "INFO",
+          "Space": 128
+        }
+      ]
+    },
+    "ShadowSync": {
+      "ref": null,
+      "Content": []
+    },
+    "ClientCertFingerprints": {
+      "Content": []
+    }
+  }
+}
