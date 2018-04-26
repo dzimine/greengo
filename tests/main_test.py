@@ -51,10 +51,6 @@ class GroupCommandTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_main(self):
-        print self.gg
-        pass
-
     def test_create_subscriptions(self):
         self.gg.state = greengo.State(state.copy())
         self.gg.state.pop('Subscriptions')

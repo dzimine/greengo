@@ -81,16 +81,21 @@ class GroupCommands(object):
         self.state['CoreDefinition'] = core_def
         _update_state(self.state)
 
-        # 3. Create Lambda functions and function definitions
-        self.create_lambdas()
+        # 3. Create Resources - policies for local and ML resource access.
+        self.create_resources()
 
-        # 4. Create devices (coming soon)
+        # 4. Create Lambda functions and function definitions
+        #    Lambda may have dependencies on resources.
+        #    TODO: refactor to take dependencies into account
+        self.create_lambdas(update_group_version=False)
 
-        # 5. Create subscriptions
+        # 5. Create devices (coming soon)
+
+        # 6. Create subscriptions
         self.create_subscriptions()
 
         # LAST. Add all the constituent parts to the Greengrass Group
-        self._create_group_version()
+        self.create_group_version()
 
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
@@ -153,7 +158,6 @@ class GroupCommands(object):
 
         self.state['Group']['Version'] = rinse(group_ver)
         _update_state(self.state)
-        return group_ver
 
     def remove(self):
         if not self.state:
@@ -167,6 +171,8 @@ class GroupCommands(object):
         self._remove_cores()
 
         self.remove_lambdas()
+
+        self.remove_resources()
 
         log.info("Reseting deployments forcefully, if they exist")
         self._gg.reset_deployments(GroupId=self.state['Group']['Id'], Force=True)
@@ -186,7 +192,7 @@ class GroupCommands(object):
             _update_state(self.state)
         return self.state['LambdaRole']['Role']['Arn']
 
-    def create_lambdas(self):
+    def create_lambdas(self, update_group_version=True):
         if not self.group.get('Lambdas'):
             log.info("Subscriptions not defined. Moving on...")
             return
@@ -273,12 +279,11 @@ class GroupCommands(object):
         self.state['FunctionDefinition']['LatestVersionDetails'] = rinse(fd_ver)
         _update_state(self.state)
 
-        log.info("Lambdas and function definition created OK!")
+        if update_group_version:
+            log.info("Updating group version with new Lambdas...")
+            self.create_group_version()
 
-        # TODO: Update group version if group exists
-        #       This must happen on adding/removing/updating of anything
-        #       and shall update state['Group']['Version']
-        #       Extra method here.
+        log.info("Lambdas and function definition created OK!")
 
     def remove_lambdas(self):
         if not (self.state and self.state.get('Lambdas')):
