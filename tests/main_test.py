@@ -18,7 +18,7 @@ def load_state(request):
     # Load test state once per session.
     global state
     with open('tests/test_state.json', 'r') as f:
-        state = json.load(f)
+        state = greengo.State(json.load(f))
 
 
 class SessionFixture():
@@ -51,12 +51,8 @@ class GroupCommandTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_main(self):
-        print self.gg
-        pass
-
     def test_create_subscriptions(self):
-        self.gg.state = state.copy()
+        self.gg.state = greengo.State(state.copy())
         self.gg.state.pop('Subscriptions')
         self.gg._gg.create_subscription_definition = MagicMock(return_value=state['Subscriptions'])
         self.gg._gg.get_subscription_definition_version = MagicMock(
@@ -65,10 +61,64 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.create_subscriptions()
         # TODO: assert calls
 
+    def test_create_subscriptions_empty(self):
+        self.gg.group.pop('Subscriptions')
+        self.gg.create_subscriptions()
+
     def test_remove_subscriptions(self):
         self.gg._gg.delete_subscription_definition = MagicMock(return_value=state['Subscriptions'])
-        self.gg.state = state.copy()
+        self.gg.state = greengo.State(state.copy())
 
         self.gg.remove_subscriptions()
         self.assertFalse(self.gg.state.get('Subscriptions'), "Subscriptions shall be removed")
-        greengo.pretty(state['Subscriptions'])
+
+    def test_create_group_version_fullset(self):
+        self.gg.state = greengo.State(state.copy())
+
+        m = MagicMock()
+        self.gg._gg.create_group_version = m
+        self.gg.create_group_version()
+
+        args, kwargs = m.call_args
+        self.assertEqual(len(kwargs), 5)  # TODO: Refine expected kwarg count
+
+    def test_create_group_version_subset(self):
+        self.gg.state = greengo.State(state.copy())
+        self.gg.state.pop('Subscriptions')
+        self.gg.state.pop('FunctionDefinition')
+
+        m = MagicMock()
+        self.gg._gg.create_group_version = m
+        self.gg.create_group_version()
+
+        args, kwargs = m.call_args
+        self.assertEqual(len(kwargs), 3)  # TODO: Refine expected kwarg count
+
+    def test_create_resources(self):
+        self.gg.group.pop('Resources')
+        self.gg.create_resources()
+
+    def test_remove_resources(self):
+        self.gg._gg.delete_resource_definition = MagicMock(return_value=state['Resources'])
+        self.gg.state = greengo.State(state.copy())
+
+        self.gg.remove_resources()
+        self.assertFalse(self.gg.state.get('Resources'), "Resources shall be removed")
+
+
+@patch('greengo.greengo.rinse', rinse)
+class LambdaTest(unittest.TestCase):
+
+    def setUp(self):
+        with patch.object(greengo.session, 'Session', SessionFixture):
+            self.gg = greengo.GroupCommands()
+
+    def tearDown(self):
+        try:
+            os.remove(greengo.STATE_FILE)
+        except OSError:
+            pass
+
+    def test_create_lambdas_empty(self):
+        self.gg.group.pop('Lambdas')
+        self.gg.create_lambdas()  # Doesn't blow up

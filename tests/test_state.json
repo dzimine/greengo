@@ -101,6 +101,38 @@
       "RoleName": "GreengoGroup_Lambda_Role"
     }
   },
+  "Resources": {
+    "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/resources/13162edc-dd2b-4efa-9e0c-04d1d2b9656e",
+    "CreationTimestamp": "2018-04-25T23:33:27.632Z",
+    "Id": "13162edc-dd2b-4efa-9e0c-04d1d2b9656e",
+    "LastUpdatedTimestamp": "2018-04-25T23:33:27.632Z",
+    "LatestVersion": "7e4755b3-9aaf-4e90-bcba-91dc40481049",
+    "LatestVersionArn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/resources/13162edc-dd2b-4efa-9e0c-04d1d2b9656e/versions/7e4755b3-9aaf-4e90-bcba-91dc40481049",
+    "LatestVersionDetails": {
+      "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/resources/13162edc-dd2b-4efa-9e0c-04d1d2b9656e/versions/7e4755b3-9aaf-4e90-bcba-91dc40481049",
+      "CreationTimestamp": "2018-04-25T23:33:27.632Z",
+      "Definition": {
+        "Resources": [
+          {
+            "Id": "resource_1_path_to_input",
+            "Name": "path_to_input",
+            "ResourceDataContainer": {
+              "LocalVolumeResourceData": {
+                "DestinationPath": "/input",
+                "GroupOwnerSetting": {
+                  "AutoAddGroupOwner": true
+                },
+                "SourcePath": "/images"
+              }
+            }
+          }
+        ]
+      },
+      "Id": "13162edc-dd2b-4efa-9e0c-04d1d2b9656e",
+      "Version": "7e4755b3-9aaf-4e90-bcba-91dc40481049"
+    },
+    "Name": "ML_infer_resources"
+  },
   "Lambdas": [
     {
       "CodeSha256": "zOSLlGYEOXjWfJ9iNFQTu7e7dcfqOOWwI3vkcxbMwoU=",
