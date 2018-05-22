@@ -55,7 +55,7 @@ class GroupCommands(object):
         self._LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
 
         _mkdir(MAGIC_DIR)
-        self.state = State(_load_state())
+        self.state = _load_state()
 
     def create(self):
         if self.state:
@@ -140,14 +140,18 @@ class GroupCommands(object):
             "and the certificates match.")
 
     def create_group_version(self):
+
+        # Create a copy so that referencing non-existent fileds not create them in self.state
+        state = State(self.state)
+
         kwargs = dict(
             GroupId=self.state['Group']['Id'],
-            CoreDefinitionVersionArn=self.state['CoreDefinition']['LatestVersionArn'],
+            CoreDefinitionVersionArn=state['CoreDefinition']['LatestVersionArn'],
             DeviceDefinitionVersionArn="",
-            FunctionDefinitionVersionArn=self.state['FunctionDefinition']['LatestVersionArn'],
-            SubscriptionDefinitionVersionArn=self.state['Subscriptions']['LatestVersionArn'],
+            FunctionDefinitionVersionArn=state['FunctionDefinition']['LatestVersionArn'],
+            SubscriptionDefinitionVersionArn=state['Subscriptions']['LatestVersionArn'],
             LoggerDefinitionVersionArn="",
-            ResourceDefinitionVersionArn=self.state['Resources']['LatestVersionArn'],
+            ResourceDefinitionVersionArn=state['Resources']['LatestVersionArn'],
         )
 
         args = dict((k, v) for k, v in kwargs.iteritems() if v)
@@ -202,7 +206,7 @@ class GroupCommands(object):
 
     def create_lambdas(self, update_group_version=True):
         if not self.group.get('Lambdas'):
-            log.info("Subscriptions not defined. Moving on...")
+            log.info("Lambdas not defined. Moving on...")
             return
 
         if self.state and self.state.get('Lambdas'):
