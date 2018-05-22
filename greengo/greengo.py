@@ -187,7 +187,15 @@ class GroupCommands(object):
     def _default_lambda_role_arn(self):
         if 'LambdaRole' not in self.state:
             log.info("Creating default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
-            role = self._create_default_lambda_role()
+            try:
+                role = self._create_default_lambda_role()
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'EntityAlreadyExists':
+                    role = self._iam.get_role(RoleName=self._LAMBDA_ROLE_NAME)
+                    log.warning("Role {0} already exists, reusing.".format(self._LAMBDA_ROLE_NAME))
+                else:
+                    raise e
+
             self.state['LambdaRole'] = rinse(role)
             _update_state(self.state)
         return self.state['LambdaRole']['Role']['Arn']

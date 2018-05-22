@@ -3,6 +3,8 @@ import json
 import unittest
 import pytest
 
+from botocore.exceptions import ClientError
+
 from mock import patch, MagicMock
 
 from greengo import greengo
@@ -122,3 +124,12 @@ class LambdaTest(unittest.TestCase):
     def test_create_lambdas_empty(self):
         self.gg.group.pop('Lambdas')
         self.gg.create_lambdas()  # Doesn't blow up
+
+    def test_role_exists(self):
+        error = ClientError(
+            error_response={'Error': {'Code': 'EntityAlreadyExists'}},
+            operation_name='CreateRole')
+        print "I am here indeed"
+
+        self.gg._iam.create_role = MagicMock(side_effect=error)
+        self.gg._default_lambda_role_arn()  # Doesn't blow up
