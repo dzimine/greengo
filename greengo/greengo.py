@@ -390,6 +390,8 @@ class GroupCommands(object):
             return self._lookup_lambda_qualified_arn(p[1])
         elif p[0] == 'Device':
             return self._lookup_device_arn(p[1])
+        elif p[0] == 'GGShadowService':
+            return p[0]
         else:
             raise ValueError("Error parsing subscription destination '{0}'. "
                              "Allowed values: 'Lambda::', 'Device::', or 'cloud'.".format(d))
@@ -456,6 +458,15 @@ class GroupCommands(object):
         self.state.pop('Resources')
         _update_state(self.state)
         log.info("Resources definition deleted OK!")
+
+    def update(self):
+        self.remove_lambdas()
+        self.remove_subscriptions()
+        self.remove_resources()
+        self.create_resources()
+        self.create_lambdas(update_group_version=True)
+        self.create_resources()
+        log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
 
     def _create_cores(self):
         # TODO: Refactor-handle state internally, make callable individually
