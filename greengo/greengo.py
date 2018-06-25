@@ -465,6 +465,7 @@ class GroupCommands(object):
         self.remove_resources()
         self.create_resources()
         self.create_lambdas(update_group_version=True)
+        self.create_subscriptions()
         self.create_resources()
         log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
 
