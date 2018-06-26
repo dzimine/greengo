@@ -460,13 +460,16 @@ class GroupCommands(object):
         log.info("Resources definition deleted OK!")
 
     def update(self):
-        self.remove_lambdas()
         self.remove_subscriptions()
+        self.remove_lambdas()
         self.remove_resources()
+
         self.create_resources()
-        self.create_lambdas(update_group_version=True)
+        self.create_lambdas()
         self.create_subscriptions()
-        self.create_resources()
+        
+        self.create_group_version()
+        
         log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
 
     def _create_cores(self):
