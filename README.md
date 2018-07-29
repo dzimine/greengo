@@ -59,11 +59,25 @@ Yeah, manual sucks... I will automate it later. Or, submit your PR!
     ```
     $ greengo deploy
     ```
+
 4. Check that everything works - see the ["Check" section](#check-the-deployment)  below.
 
 5. **Profit !**
 
-6. Clean-up when done playing.
+6. Work on it: create, change or remove Lambda functions, subscriptions, resources, and then update Greengrass. 
+
+    ```
+    $ greengo update
+    ```
+
+Apply your changes by deploying it again:
+
+    ```
+    $ greengo deploy
+    ```
+
+
+7. Clean-up when done playing.
 
     Remove the group definitions on AWS:
 
