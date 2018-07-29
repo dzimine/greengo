@@ -246,7 +246,7 @@ class GroupCommands(object):
                         # Function creation immediately after role creation fails with
                         # "The role defined for the function cannot be assumed by Lambda."
                         # See StackOverflow https://goo.gl/eTfqsS
-                        log.warning("We hit AWS bug: the role is not yet propogated."
+                        log.warning("We hit AWS bug: the role is not yet propagated."
                                     "Taking 10 sec nap")
                         sleep(10)
                         continue
