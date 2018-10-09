@@ -159,6 +159,32 @@
       "ZipPath": "/path/to/greengo/.gg/GreengrassHelloWorld.zip"
     }
   ],
+  "Loggers": {
+    "Arn": "arn:aws:greengrass:us-east-1:000000000000:/greengrass/definition/loggers/d89956dd-18c0-4833-919f-aafa15e171cc",
+    "CreationTimestamp": "2018-10-09T21:04:16.840Z",
+    "Id": "d89956dd-18c0-4833-919f-aafa15e171cc",
+    "LastUpdatedTimestamp": "2018-10-09T21:04:16.840Z",
+    "LatestVersion": "d2624229-619a-453d-91cb-264df916d43c",
+    "LatestVersionArn": "arn:aws:greengrass:us-east-1:000000000000:/greengrass/definition/loggers/d89956dd-18c0-4833-919f-aafa15e171cc/versions/d2624229-619a-453d-91cb-264df916d43c",
+    "LatestVersionDetails": {
+      "Arn": "arn:aws:greengrass:us-east-1:000000000000:/greengrass/definition/loggers/d89956dd-18c0-4833-919f-aafa15e171cc/versions/d2624229-619a-453d-91cb-264df916d43c",
+      "CreationTimestamp": "2018-10-09T21:04:16.840Z",
+      "Definition": {
+        "Loggers": [
+          {
+            "Component": "Lambda",
+            "Id": "logger_1",
+            "Level": "DEBUG",
+            "Space": 1024,
+            "Type": "FileSystem"
+          }
+        ]
+      },
+      "Id": "d89956dd-18c0-4833-919f-aafa15e171cc",
+      "Version": "d2624229-619a-453d-91cb-264df916d43c"
+    },
+    "Name": "GreengoGroup_loggers"
+  },
   "Subscriptions": {
     "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/subscriptions/37d25372-c98e-4435-978d-756b14a11911",
     "CreationTimestamp": "2018-04-04T09:21:46.234Z",

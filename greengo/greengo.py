@@ -459,6 +459,50 @@ class GroupCommands(object):
         _update_state(self.state)
         log.info("Resources definition deleted OK!")
 
+    def create_loggers(self):
+        if not self.group.get('Loggers'):
+            log.info("Loggers not defined. Moving on...")
+            return
+
+        if self.state and self.state.get('Loggers'):
+            log.warning("Previously created Loggers exist. Remove before creating!")
+            return
+
+        loggers = self.group['Loggers']
+        name = self.name + '_loggers'
+        log.info("Creating loggers definition: '{0}'".format(name))
+
+        res_def = self._gg.create_logger_definition(
+            Name=name,
+            InitialVersion={'Loggers': loggers}
+        )
+
+        self.state['Loggers'] = rinse(res_def)
+        _update_state(self.state)
+
+        log_def_ver = self._gg.get_logger_definition_version(
+            LoggerDefinitionId=self.state['Loggers']['Id'],
+            LoggerDefinitionVersionId=self.state['Loggers']['LatestVersion'])
+
+        self.state['Loggers']['LatestVersionDetails'] = rinse(log_def_ver)
+        _update_state(self.state)
+
+        log.info("Loggers definition created OK!")
+
+    def remove_loggers(self):
+        if not (self.state and self.state.get('Loggers')):
+            log.info("There seem to be nothing to remove.")
+            return
+        log.info("Deleting loggers definition Id='{0}'".format(
+            self.state['Loggers']['Id']))
+
+        self._gg.delete_logger_definition(
+            LoggerDefinitionId=self.state['Loggers']['Id'])
+
+        self.state.pop('Loggers')
+        _update_state(self.state)
+        log.info("Loggers definition deleted OK!")
+
     def update(self):
         self.remove_subscriptions()
         self.remove_lambdas()
@@ -467,9 +511,9 @@ class GroupCommands(object):
         self.create_resources()
         self.create_lambdas()
         self.create_subscriptions()
-        
+
         self.create_group_version()
-        
+
         log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
 
     def _create_cores(self):

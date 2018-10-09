@@ -107,6 +107,17 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.remove_resources()
         self.assertFalse(self.gg.state.get('Resources'), "Resources shall be removed")
 
+    def test_create_loggers(self):
+        self.gg.group.pop('Loggers')
+        self.gg.create_loggers()
+
+    def test_remove_loggers(self):
+        self.gg._gg.delete_resource_definition = MagicMock(return_value=state['Loggers'])
+        self.gg.state = greengo.State(state.copy())
+
+        self.gg.remove_loggers()
+        self.assertFalse(self.gg.state.get('Loggers'), "Loggers shall be removed")
+
 
 @patch('greengo.greengo.rinse', rinse)
 class LambdaTest(unittest.TestCase):
