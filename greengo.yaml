@@ -36,7 +36,7 @@ Subscriptions:
     Target: Lambda::GreengrassHelloWorld
 
 Resources:
-    # Resource as defined at http://boto3.readthedocs.io/en/latest/reference/services/greengrass.html#Greengrass.Client.create_resource_definition_version
+    # For parameter definitions, see http://boto3.readthedocs.io/en/latest/reference/services/greengrass.html#Greengrass.Client.create_resource_definition_version
   - Name: path_to_input
     Id: resource_1_path_to_input
     LocalVolumeResourceData:
@@ -45,7 +45,16 @@ Resources:
       GroupOwnerSetting:
         AutoAddGroupOwner: True
 
+Loggers:
+    # For parameter definitions, see https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/greengrass.html#Greengrass.Client.create_logger_definition
+  - Component: Lambda  # 'GreengrassSystem'|'Lambda'
+    Id: logger_1       # Arbitrary string
+    Level: DEBUG       # 'DEBUG'|'INFO'|'WARN'|'ERROR'|'FATAL'
+    Space: 1024        # The amount of file space, in KB, to use if the local file system is used for logging purposes
+    Type: FileSystem   # 'FileSystem'|'AWSCloudWatch'
+
 Devices: # not implemented
   - name: ml_take2_thing_1
     key_path: ./certs
+
 
