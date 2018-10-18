@@ -92,7 +92,10 @@ class GroupCommands(object):
         # 5. Create devices (coming soon)
 
         # 6. Create subscriptions
-        self.create_subscriptions()
+        self.create_subscriptions(update_group_version=False)
+
+        # 7. Create logger definitions
+        self.create_loggers()  # TODO: I'll also need group-version update to change it later...
 
         # LAST. Add all the constituent parts to the Greengrass Group
         self.create_group_version()
@@ -150,7 +153,7 @@ class GroupCommands(object):
             DeviceDefinitionVersionArn="",
             FunctionDefinitionVersionArn=state['FunctionDefinition']['LatestVersionArn'],
             SubscriptionDefinitionVersionArn=state['Subscriptions']['LatestVersionArn'],
-            LoggerDefinitionVersionArn="",
+            LoggerDefinitionVersionArn=state['Loggers']['LatestVersionArn'],
             ResourceDefinitionVersionArn=state['Resources']['LatestVersionArn'],
         )
 
@@ -327,7 +330,7 @@ class GroupCommands(object):
 
         log.info("Lambdas and function definition deleted OK!")
 
-    def create_subscriptions(self):
+    def create_subscriptions(self, update_group_version=True):
         if not self.group.get('Subscriptions'):
             log.info("Subscriptions not defined. Moving on...")
             return
@@ -365,6 +368,10 @@ class GroupCommands(object):
 
         self.state['Subscriptions']['LatestVersionDetails'] = rinse(sub_def_ver)
         _update_state(self.state)
+
+        if update_group_version:
+            log.info("Updating group version with new Lambdas...")
+            self.create_group_version()
 
         log.info("Subscription definition created OK!")
 
