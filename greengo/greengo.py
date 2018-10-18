@@ -207,6 +207,53 @@ class GroupCommands(object):
             _update_state(self.state)
         return self.state['LambdaRole']['Role']['Arn']
 
+    def update_lambda(self, lambda_name):
+        if not (self.state and self.state.get('Lambdas')):
+            log.info("No lambdas created. Create first...")
+            return
+
+        # TODO: need to pop the dict from array (to replace later.. or replace in place?)
+        lr = next((lr for lr in self.state['Lambdas'] if lr['FunctionName'] == lambda_name), None)
+        if not lr:
+            log.error("No lambda function '{0}' found.".format(lambda_name))
+            return
+
+        l = next((l for l in self.group['Lambdas'] if l['name'] == lambda_name), None)
+        if not l:
+            log.error("No definition for lambda function '{0}'.".format(lambda_name))
+            return
+
+        log.info("Updating lambda function code for '{0}'".format(lr['FunctionName']))
+
+        zf = shutil.make_archive(
+            os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
+        log.debug("Lambda deployment Zipped to '{0}'".format(zf))
+
+        with open(zf, 'rb') as f:
+            lr_updated = self._lambda.update_function_code(
+                FunctionName=l['name'],
+                ZipFile=f.read(),
+                Publish=True
+            )
+
+        lr.update(rinse(lr_updated))
+        _update_state(self.state)
+        log.info("Lambda function '{0}' updated".format(lr['FunctionName']))
+
+        log.info("Updating alias '{0}'...".format(l.get('alias', 'default')))
+        alias = self._lambda.update_alias(
+            FunctionName=lr['FunctionName'],
+            Name=l.get('alias', 'default'),
+            FunctionVersion=lr['Version']
+        )
+
+        log.info("Lambda alias updated. FunctionVersion:'{0}', Arn:'{1}'".format(
+            alias['FunctionVersion'], alias['AliasArn']))
+        # TODO: save alias? If so, where? If the alias name changed in group,
+        # then LambdaDefinitions should also be updated.
+
+        log.info("Lambdas function {0} updated OK!".format(lambda_name))
+
     def create_lambdas(self, update_group_version=True):
         if not self.group.get('Lambdas'):
             log.info("Lambdas not defined. Moving on...")
