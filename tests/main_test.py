@@ -82,7 +82,7 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.create_group_version()
 
         args, kwargs = m.call_args
-        self.assertEqual(len(kwargs), 5)  # TODO: Refine expected kwarg count
+        self.assertEqual(len(kwargs), 6)  # TODO: Refine expected kwarg count
 
     def test_create_group_version_subset(self):
         self.gg.state = greengo.State(state.copy())
@@ -94,7 +94,7 @@ class GroupCommandTest(unittest.TestCase):
         self.gg.create_group_version()
 
         args, kwargs = m.call_args
-        self.assertEqual(len(kwargs), 3)  # TODO: Refine expected kwarg count
+        self.assertEqual(len(kwargs), 4)  # TODO: Refine expected kwarg count
 
     def test_create_resources(self):
         self.gg.group.pop('Resources')
