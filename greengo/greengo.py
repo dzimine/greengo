@@ -157,7 +157,7 @@ class GroupCommands(object):
             ResourceDefinitionVersionArn=state['Resources']['LatestVersionArn'],
         )
 
-        args = dict((k, v) for k, v in kwargs.iteritems() if v)
+        args = dict((k, v) for k, v in kwargs.items() if v)
 
         log.debug("Creating group version with settings:\n{0}".format(pretty(args)))
 

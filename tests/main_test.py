@@ -140,7 +140,6 @@ class LambdaTest(unittest.TestCase):
         error = ClientError(
             error_response={'Error': {'Code': 'EntityAlreadyExists'}},
             operation_name='CreateRole')
-        print "I am here indeed"
 
         self.gg._iam.create_role = MagicMock(side_effect=error)
         self.gg._default_lambda_role_arn()  # Doesn't blow up
