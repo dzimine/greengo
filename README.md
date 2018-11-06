@@ -1,6 +1,7 @@
 # Boilerplate for AWS IoT Greengrass
 [![Build Status](https://travis-ci.org/dzimine/greengo.svg?branch=master)](https://travis-ci.org/dzimine/greengo)
 ![Python 2.7](https://img.shields.io/badge/python-2.7-blue.svg)
+![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)
 [![PyPI version](https://badge.fury.io/py/greengo.svg)](https://badge.fury.io/py/greengo)
 
 <img src="https://github.com/dzimine/greengo/blob/master/misc/greengo.png?raw=true" width="50px"> Greengo: a starter project to bring up (and clean-up!) AWS Greengrass setup for play and profit. If you followed the [GreenGrass Getting Started Guide](https://docs.aws.amazon.com/greengrass/latest/developerguide/gg-gs.html), here you find it automated, as code.
