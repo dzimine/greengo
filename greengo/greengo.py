@@ -20,7 +20,7 @@ DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
 STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
 
-DEPLOY_TIMEOUT = 45  # Timeout, seconds
+DEPLOY_TIMEOUT = 90  # Timeout, seconds
 
 
 class GroupCommands(object):
@@ -89,6 +89,8 @@ class GroupCommands(object):
         #    TODO: refactor to take dependencies into account
         self.create_lambdas(update_group_version=False)
 
+        self.create_connectors(update_group_version=False)
+
         # 5. Create devices (coming soon)
 
         # 6. Create subscriptions
@@ -155,6 +157,7 @@ class GroupCommands(object):
             SubscriptionDefinitionVersionArn=state['Subscriptions']['LatestVersionArn'],
             LoggerDefinitionVersionArn=state['Loggers']['LatestVersionArn'],
             ResourceDefinitionVersionArn=state['Resources']['LatestVersionArn'],
+            ConnectorDefinitionVersionArn=state['Connectors']['LatestVersionArn']
         )
 
         args = dict((k, v) for k, v in kwargs.items() if v)
@@ -446,9 +449,12 @@ class GroupCommands(object):
             return self._lookup_device_arn(p[1])
         elif p[0] == 'GGShadowService':
             return p[0]
+        elif p[0] == 'Connector':
+            return self._lookup_connector_arn(p[1])
         else:
-            raise ValueError("Error parsing subscription destination '{0}'. "
-                             "Allowed values: 'Lambda::', 'Device::', or 'cloud'.".format(d))
+            raise ValueError(
+                "Error parsing subscription destination '{0}'. Allowed values: "
+                "'Lambda::', 'Device::', 'Connector::', 'GGShadowService', or 'cloud'.".format(d))
 
     def _lookup_lambda_qualified_arn(self, name):
         details = self.state['FunctionDefinition']['LatestVersionDetails']
@@ -460,6 +466,14 @@ class GroupCommands(object):
 
     def _lookup_device_arn(self, name):
         raise NotImplementedError("WIP: Devices not implemented yet.")
+
+    def _lookup_connector_arn(self, name):
+        details = self.state['Connectors']['LatestVersionDetails']
+        for l in details['Definition']['Connectors']:
+            if l['Id'] == name:
+                return l['ConnectorArn']
+        log.error("Connector '{0}' not found".format(name))
+        return None
 
     def create_resources(self):
         if not self.group.get('Resources'):
@@ -556,6 +570,56 @@ class GroupCommands(object):
         self.state.pop('Loggers')
         _update_state(self.state)
         log.info("Loggers definition deleted OK!")
+
+    # TODO: Refactor.
+    # Connectors, Loggers, and Subscription code are all the same, exactly.
+    def create_connectors(self, update_group_version=True):
+        if not self.group.get('Connectors'):
+            log.info("Connectors not defined. Moving on...")
+            return
+
+        if self.state and self.state.get('Connectors'):
+            log.warning("Previously created Connectors exist. Remove before creating!")
+            return
+
+        connectors = self.group['Connectors']
+        name = self.name + '_connectors'
+        log.info("Creating connectors definition: '{0}'".format(name))
+
+        d = self._gg.create_connector_definition(
+            Name=name,
+            InitialVersion={'Connectors': connectors}
+        )
+
+        self.state['Connectors'] = rinse(d)
+        _update_state(self.state)
+
+        d_ver = self._gg.get_connector_definition_version(
+            ConnectorDefinitionId=self.state['Connectors']['Id'],
+            ConnectorDefinitionVersionId=self.state['Connectors']['LatestVersion'])
+
+        self.state['Connectors']['LatestVersionDetails'] = rinse(d_ver)
+        _update_state(self.state)
+
+        if update_group_version:
+            log.info("Updating group version with new Connectors...")
+            self.create_group_version()
+
+        log.info("Connectors definition created OK!")
+
+    def remove_connectors(self):
+        if not (self.state and self.state.get('Connectors')):
+            log.info("There seem to be nothing to remove.")
+            return
+        log.info("Deleting connector definition Id='{0}'".format(
+            self.state['Connectors']['Id']))
+
+        self._gg.delete_connector_definition(
+            ConnectorDefinitionId=self.state['Connectors']['Id'])
+
+        self.state.pop('Connectors')
+        _update_state(self.state)
+        log.info("Connectors definition deleted OK!")
 
     def update(self):
         self.remove_subscriptions()
