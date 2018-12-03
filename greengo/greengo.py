@@ -4,6 +4,7 @@ import fire
 import json
 import yaml
 import shutil
+import urllib
 from time import sleep
 import logging
 from boto3 import session
@@ -103,6 +104,11 @@ class GroupCommands(object):
         self.create_group_version()
 
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
+
+    def create_root_key(self):
+        if not os.path.isfile(self.group['certs']['keypath']+"/root-CA.crt"):
+            urllib.urlretrieve("https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem",self.group['certs']['keypath']+"/root-CA.crt")
+
 
     def deploy(self):
         if not self.state:
@@ -796,7 +802,7 @@ class GroupCommands(object):
 
         config = {
             "coreThing": {
-                "caPath": "root.ca.pem",
+                "caPath": "root-CA.crt",
                 "certPath": core_thing['thingName'] + ".pem",
                 "keyPath": core_thing['thingName'] + ".key",
                 "thingArn": core_thing['thingArn'],
