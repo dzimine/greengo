@@ -2,6 +2,7 @@
 .*
 certs/**
 config/**
+downloads/**
 venv
 *.pyc
 __pycache__/**
