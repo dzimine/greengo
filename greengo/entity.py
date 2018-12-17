@@ -9,7 +9,7 @@ class Entity(object):
     _session = None
 
     def __init__(self, group, state):
-        self.name = "REPLACE WITH CHILD CLASS NAME!"
+        self.type = "REPLACE WITH CHILD CLASS TYPE!"
         self._state = state
         self._group = group
 
@@ -22,7 +22,7 @@ class Entity(object):
         self._requirements = []
 
     def _pre_create(self, update_group_version=True):
-        log.info("Creating {}".format(self.name))
+        log.info("Creating {}...".format(self.type.lower()))
         # check if requred objects alrady created, if not, warn and exit.
         # do the work of your own creation
         # update requirements
@@ -36,7 +36,7 @@ class Entity(object):
         raise NotImplementedError
 
     def _post_create(self):
-        log.info("{} created OK!".format(self.name))
+        log.info("{} created OK!".format(self.type))
 
     def create(self, update_group_version=True):
         self._pre_create()
@@ -44,13 +44,13 @@ class Entity(object):
         self._post_create()
 
     def _pre_remove(self):
-        log.info("Removing {}".format(self.name))
+        log.info("Removing {}".format(self.type.lower()))
 
     def _do_remove(self):
         raise NotImplementedError
 
     def _post_remove(self):
-        log.info("{} removed OK!".format(self.name))
+        log.info("{} removed OK!".format(self.type.lower()))
 
     def remove(self):
         self._pre_remove()
