@@ -1,4 +1,7 @@
 import logging
+
+from utils import pretty
+
 log = logging.getLogger(__name__)
 
 
@@ -62,6 +65,31 @@ class Entity(object):
 
     @classmethod
     def create_group_version(klass, state):
-        log.debug("Creating group version with settings:\n{0}".format("bla"))
-        # log.debug("Creating group version with settings:\n{0}".format(pretty(args)))
-        pass
+        # Compile a list of non-empty arguments from the super-set,
+        # https://docs.aws.amazon.com/greengrass/latest/apireference/definitions-groupversion.html
+        kwargs = dict(
+            GroupId=state.get('Group')['Id'],  # REQUIRED
+            CoreDefinitionVersionArn=state.get(
+                'CoreDefinition', {}).get('LatestVersionArn', ""),
+            FunctionDefinitionVersionArn=state.get(
+                'FunctionDefinition', {}).get('LatestVersionArn', ""),
+            SubscriptionDefinitionVersionArn=state.get(
+                'Subscriptions', {}).get('LatestVersionArn', ""),
+            LoggerDefinitionVersionArn=state.get(
+                'Loggers', {}).get('LatestVersionArn', ""),
+            ResourceDefinitionVersionArn=state.get(
+                'Resources', {}).get('LatestVersionArn', ""),
+            ConnectorDefinitionVersionArn=state.get(
+                'Connectors', {}).get('LatestVersionArn', ""),
+            DeviceDefinitionVersionArn=""  # NOT IMPLEMENTED
+        )
+
+        args = dict((k, v) for k, v in kwargs.items() if v)
+
+        log.debug("Creating group version with settings:\n{0}".format(pretty(args)))
+
+        _gg = Entity._session.client("greengrass")
+        group_ver = _gg.create_group_version(**args)
+
+        # TODO:XXX refactor state and save nested keys.
+        state.update('Group.Version', group_ver)

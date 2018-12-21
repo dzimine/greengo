@@ -33,11 +33,11 @@ class State(object):
 
     def __init__(self, file):
         # Entities map: { entityName: entity }
-        self._file = file
         self._entities = {}
         self._state = {}
-
-        self.load()
+        self._file = file
+        if file:
+            self.load()
 
     def load(self):
         if not os.path.exists(self._file):
@@ -48,11 +48,13 @@ class State(object):
                 self._state = json.load(f)
 
     def save(self):
+        if not self._file:
+            return
         try:
             with open(self._file, 'w') as f:
                 json.dump(self._state, f, indent=2,
                           separators=(',', ': '), sort_keys=True, default=str)
-                log.debug("Updated group state in state file '{0}'".format(self._file))
+                # log.debug("Updated group state in state file '{0}'".format(self._file))
         except IOError as e:
             # Assume we miss the directory... Create it and try again
             if e.errno != errno.ENOENT:
@@ -77,12 +79,19 @@ class State(object):
         # 2. save in file
         pass
 
-    def remove(self):
-        self.state = {}
-        try:
-            os.remove(self._file)
-        except OSError:
-            log.warning("State file not removed (missing?): {}".format(self._file))
+    def remove(self, key=None):
+        if key:
+            try:
+                self._state.pop(key)
+                self.save()
+            except KeyError:
+                log.warning("Can not remove key '{}' from State - missing".format(key))
+        else:
+            self.state = {}
+            try:
+                os.remove(self._file)
+            except OSError:
+                log.warning("State file not removed (missing?): {}".format(self._file))
 
 
 class Commands(object):
@@ -99,6 +108,7 @@ class Commands(object):
 
         Entity._session = s
 
+        # XXX: remvoe this
         self._gg = s.client("greengrass")
         self._iot = s.client("iot")
         self._lambda = s.client("lambda")
@@ -107,7 +117,7 @@ class Commands(object):
 
         try:
             with open(DEFINITION_FILE, 'r') as f:
-                self.group = self.group = yaml.safe_load(f)
+                self.group = yaml.safe_load(f)
         except IOError:
             log.error("Group definition file `greengo.yaml` not found. "
                       "Create file, and define the group definition first. "
