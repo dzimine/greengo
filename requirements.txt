@@ -1,6 +1,10 @@
+# Main requirements
 fire
 boto3
 botocore
 pyyaml
-pytest
+# Testing requirements
 mock
+pytest
+pytest-flakes
+pytest-cov
