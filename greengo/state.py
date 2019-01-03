@@ -45,7 +45,18 @@ class State(object):
         return bool(self._state)
 
     def update(self, key, body):
-        self._state[key] = body
+        '''
+        Updates nested keys using dot as separator, like 'foo.bar.buz'.
+        Creates missing keys as nessessary.
+        '''
+        tree = self._state
+        prev = None
+        for k in key.split('.'):
+            if prev is not None:
+                tree = tree.setdefault(prev, {})
+            prev = k
+
+        tree[prev] = body
         self.save()
 
     def get(self, key=None, default=None):

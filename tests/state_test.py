@@ -20,6 +20,18 @@ class StateTest(unittest.TestCase):
 
         self.assertDictEqual(body, self.state.get('key'))
 
+    def test_nested_new(self):
+        self.state.update('Group.Version', 999)
+        print(self.state._state)
+        self.assertEqual(self.state._state['Group']['Version'], 999)
+
+        # TODO: get using dotted notation.
+
+    def test_nested_existing(self):
+        self.state.update('a.b', 999)
+        print(self.state._state)
+        self.assertEqual(self.state._state['a']['b'], 999)
+
     def test_get(self):
         self.assertDictEqual(self.body, self.state.get())
         self.assertDictEqual(self.body['a'], self.state.get('a'))
