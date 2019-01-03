@@ -107,7 +107,7 @@
       "Version": "db511c52-fcc9-495c-8dc3-c703736939db"
     }
   },
-  "Group.Version": "<MagicMock name='mock.create_group_version()' id='4343646096'>",
+  "Group.Version": "<MagicMock name='mock.create_group_version()' id='4518902096'>",
   "LambdaRole": {
     "Role": {
       "Arn": "arn:aws:iam::000000000000:role/GreengoGroup_Lambda_Role",

@@ -83,9 +83,7 @@ class Entity(object):
                 'Connectors', {}).get('LatestVersionArn', ""),
             DeviceDefinitionVersionArn=""  # NOT IMPLEMENTED
         )
-
         args = dict((k, v) for k, v in kwargs.items() if v)
-
         log.debug("Creating group version with settings:\n{0}".format(pretty(args)))
 
         _gg = Entity._session.client("greengrass")
