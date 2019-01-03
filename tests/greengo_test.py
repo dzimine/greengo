@@ -122,9 +122,12 @@ class CommandTest(unittest.TestCase):
 class EntityTest(unittest.TestCase):
 
     def test_create_group_version__full_state(self):
+        global state
         with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
-
-            Entity.create_group_version(state)
+            # Avoid using `state` directly: it'll override the test JSON file.
+            ministate = greengo.State(file=None)
+            ministate._state = state._state.copy()
+            Entity.create_group_version(ministate)
 
             s.greengrass.create_group_version.assert_called_once()
             args, kwargs = s.greengrass.create_group_version.call_args

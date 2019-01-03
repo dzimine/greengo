@@ -37,7 +37,7 @@ class Group(Entity):
     def _do_remove(self):
 
         log.info("Reseting deployments forcefully, if they exist")
-        print(json.dumps(self._state._state['Group'], indent=4))
+        print(json.dumps(self._state._state['Group'], indent=4, default=str))
         self._gg.reset_deployments(GroupId=self._state.get('Group')['Id'], Force=True)
 
         self._remove_cores()
