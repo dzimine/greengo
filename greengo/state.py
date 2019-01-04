@@ -60,9 +60,17 @@ class State(object):
         self.save()
 
     def get(self, key=None, default=None):
+        '''
+        Get value. Key may be nested using dot as separator, like 'foo.bar.buz'.
+        '''
+        branch = self._state
         if key:
-            return self._state.get(key, default)
-        return self._state
+            for k in key.split('.'):
+                branch = branch.get(k, default)
+                if branch == default:
+                    break
+
+        return branch
 
     def remove(self, key=None):
         if key:

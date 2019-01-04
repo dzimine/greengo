@@ -72,7 +72,8 @@ class CommandTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_create__all_new(self):
+    @patch('time.sleep', return_value=None)
+    def test_create__all_new(self, s):
         self.assertFalse(self.gg.state.get(), "State must be empty first")
 
         self.gg.create()
@@ -83,6 +84,7 @@ class CommandTest(unittest.TestCase):
         self.assertIsNotNone(self.gg.state.get('Cores'))
         self.assertIsNotNone(self.gg.state.get('CoreDefinition'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
+        self.assertIsNotNone(self.gg.state.get('Group.Version'))
 
         # Check that cert and config files have been created
         self.assertTrue(
@@ -102,7 +104,8 @@ class CommandTest(unittest.TestCase):
 
         self.assertFalse(r)
 
-    def test_remove(self):
+    @patch('time.sleep', return_value=None)
+    def test_remove(self, s):
         # Tempted to do greengo.State("tests/test_state.json")?
         # Or use `state`? DONT! `remove` will delete the state fixture file.
         self.gg.state._state = state._state.copy()

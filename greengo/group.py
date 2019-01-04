@@ -1,6 +1,6 @@
 import logging
 import json
-from time import sleep
+import time
 from botocore.exceptions import ClientError
 
 from entity import Entity
@@ -37,13 +37,13 @@ class Group(Entity):
     def _do_remove(self):
 
         log.info("Reseting deployments forcefully, if they exist")
-        print(json.dumps(self._state._state['Group'], indent=4, default=str))
-        self._gg.reset_deployments(GroupId=self._state.get('Group')['Id'], Force=True)
+        # print(json.dumps(self._state._state['Group'], indent=4, default=str))
+        self._gg.reset_deployments(GroupId=self._state.get('Group.Id'), Force=True)
 
         self._remove_cores()
 
-        log.info("Deleting group '{0}'".format(self._state.get('Group')['Id']))
-        self._gg.delete_group(GroupId=self._state.get('Group')['Id'])
+        log.info("Deleting group '{0}'".format(self._state.get('Group.Id')))
+        self._gg.delete_group(GroupId=self._state.get('Group.Id'))
 
         self._state.remove(self.type)
 
@@ -223,7 +223,7 @@ class Group(Entity):
 
                 log.debug(
                     "--- taking 1 sec. nap as a superstition to let certificate update propagate...")
-                sleep(1)
+                time.sleep(1)
 
                 log.debug("--- deleting certificate: '{0}'".format(core['keys']['certificateId']))
                 self._iot.delete_certificate(certificateId=core['keys']['certificateId'])
