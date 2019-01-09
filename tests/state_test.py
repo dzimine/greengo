@@ -8,7 +8,7 @@ from greengo.state import State
 class StateTest(unittest.TestCase):
     def setUp(self):
         self.state = State(file=None)
-        self.body = {'a': {'b': 'c'}, 'x': {'y': 'z'}}
+        self.body = {'a': {'b': 'c'}, 'x': {'y': {'z': 1}}}
         self.state._state = self.body
 
     def tearDown(self):
@@ -20,9 +20,26 @@ class StateTest(unittest.TestCase):
 
         self.assertDictEqual(body, self.state.get('key'))
 
+    def test_update__nested_new(self):
+        self.state.update('Group.Version', 999)
+        self.assertEqual(self.state._state['Group']['Version'], 999)
+
+        self.assertEqual(self.state.get('Group.Version'), 999)
+
+    def test_update__nested_existing(self):
+        self.state.update('a.b', 999)
+        self.assertEqual(self.state._state['a']['b'], 999)
+
     def test_get(self):
         self.assertDictEqual(self.body, self.state.get())
         self.assertDictEqual(self.body['a'], self.state.get('a'))
+
+    def test_get__nested(self):
+        self.assertDictEqual(self.body, self.state.get())
+        self.assertEqual(self.body['a']['b'], self.state.get('a.b'))
+
+        self.assertEqual(self.state.get('x.xy.z', 7), 7)
+        self.assertEqual(self.state.get('x.x.zy'), None)
 
     def test_remove(self):
         self.assertDictEqual(self.body['a'], self.state.get('a'))

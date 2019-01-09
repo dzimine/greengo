@@ -72,7 +72,8 @@ class CommandTest(unittest.TestCase):
         except OSError:
             pass
 
-    def test_create__all_new(self):
+    @patch('time.sleep', return_value=None)
+    def test_create__all_new(self, s):
         self.assertFalse(self.gg.state.get(), "State must be empty first")
 
         self.gg.create()
@@ -83,6 +84,7 @@ class CommandTest(unittest.TestCase):
         self.assertIsNotNone(self.gg.state.get('Cores'))
         self.assertIsNotNone(self.gg.state.get('CoreDefinition'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
+        self.assertIsNotNone(self.gg.state.get('Group.Version'))
 
         # Check that cert and config files have been created
         self.assertTrue(
@@ -102,7 +104,8 @@ class CommandTest(unittest.TestCase):
 
         self.assertFalse(r)
 
-    def test_remove(self):
+    @patch('time.sleep', return_value=None)
+    def test_remove(self, s):
         # Tempted to do greengo.State("tests/test_state.json")?
         # Or use `state`? DONT! `remove` will delete the state fixture file.
         self.gg.state._state = state._state.copy()
@@ -122,9 +125,12 @@ class CommandTest(unittest.TestCase):
 class EntityTest(unittest.TestCase):
 
     def test_create_group_version__full_state(self):
+        global state
         with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
-
-            Entity.create_group_version(state)
+            # Avoid using `state` directly: it'll override the test JSON file.
+            ministate = greengo.State(file=None)
+            ministate._state = state._state.copy()
+            Entity.create_group_version(ministate)
 
             s.greengrass.create_group_version.assert_called_once()
             args, kwargs = s.greengrass.create_group_version.call_args

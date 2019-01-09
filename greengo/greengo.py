@@ -7,6 +7,8 @@ import logging
 from boto3 import session
 # from botocore.exceptions import ClientError
 
+from __init__ import __version__
+
 from entity import Entity
 from state import State
 from group import Group
@@ -60,6 +62,9 @@ class Commands(object):
         self.state = State(STATE_FILE)
 
         self.name = self.group['Group']['name']
+
+    def version(self):
+        print('Greengo version {}'.format(__version__))
 
     def create(self):
         if self.state.get():
