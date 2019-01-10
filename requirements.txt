@@ -6,5 +6,6 @@ pyyaml
 # Testing requirements
 mock
 pytest
+unittest2
 pytest-flakes
 pytest-cov
