@@ -1,10 +1,11 @@
 import os
 import shutil
-import unittest
+import unittest2 as unittest
 import pytest
 from mock import patch, MagicMock
 
 from greengo import greengo
+from greengo.state import State
 from greengo.entity import Entity
 
 # Do not override the production state, work with testing state.
@@ -34,6 +35,14 @@ class SessionFixture():
             return_value=state.get('Group'))
         self.greengrass.create_core_definition = MagicMock(
             return_value=state.get('CoreDefinition'))
+
+        subscriptions_return = state.get('Subscriptions').copy()
+        subscription_definition_return = subscriptions_return.pop('LatestVersionDetails')
+
+        self.greengrass.create_subscription_definition = MagicMock(
+            return_value=subscriptions_return)
+        self.greengrass.get_subscription_definition_version = MagicMock(
+            return_value=subscription_definition_return)
 
         self.iot = MagicMock()
         self.iot.create_keys_and_certificate = MagicMock(
@@ -112,11 +121,51 @@ class CommandTest(unittest.TestCase):
 
         self.gg.remove()
 
+        # TODO: assert that fnctions were called...
+
     def test_remove__nothing(self):
         self.assertFalse(self.gg.remove())
 
-    # def test_create_subscriptions(self):
-    #     self.gg.create_subscriptions()
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__no_group(self, fm):
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+            self.assertFalse(fm.called)
+            self.assertTrue("Group must be created before Subscriptions" in '\n'.join(l.output))
+
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__not_defined(self, fm):
+        self.gg.group.pop('Subscriptions')
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("skipping" in '\n'.join(l.output))
+
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__already_created(self, fm):
+        # Pretend that it's already created
+        self.gg.state.update('Group', "not_empty")
+        self.gg.state.update('Subscriptions', "not_empty")
+
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("already created" in '\n'.join(l.output))
+
+    def test_create_subscriptions__create(self):
+        global state
+        # Copy over state and remove Subscriptions
+        self.gg.state._state = state._state.copy()
+        self.gg.state.remove('Subscriptions')
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+
+        self.gg.create_subscriptions()
+
+        print(self.gg.state.get('Subscriptions'))
+        self.assertIsNotNone(self.gg.state.get('Subscriptions'))
+        assert self.gg.state.get('Subscriptions') == state.get('Subscriptions')
 
     # def test_remove_subscriptions(self):
     #     self.gg.remove_subscriptions()
@@ -155,3 +204,15 @@ class EntityTest(unittest.TestCase):
 
             s.greengrass.create_group_version.assert_called_once_with(
                 GroupId='123')
+
+    @patch('greengo.entity.Entity._do_create')
+    def test_create_entity__missed_requirements(self, fm):
+        e = Entity({'Entity': "something"}, State(file=None))
+        e.type = "Entity"
+        e._requirements = ['Group', 'Lambdas']
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            e.create()
+            self.assertFalse(fm.called)
+            output = '\n'.join(l.output)
+            assert "Group" in output
+            assert "Lambdas" in output

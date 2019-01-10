@@ -26,7 +26,7 @@ class Group(Entity):
         # self._iam = s.client("iam")
         self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
 
-    def _do_create(self, update_group_version):
+    def _do_create(self):
         log.info("Creating group '{}'".format(self._group['Group']['name']))
 
         g = rinse(self._gg.create_group(Name=self.name))
@@ -44,8 +44,6 @@ class Group(Entity):
 
         log.info("Deleting group '{0}'".format(self._state.get('Group.Id')))
         self._gg.delete_group(GroupId=self._state.get('Group.Id'))
-
-        self._state.remove(self.type)
 
     def _create_cores(self):
         # Design notes:
