@@ -1,8 +1,8 @@
 import os
 import shutil
 import unittest2 as unittest
-import pytest
-from mock import patch, MagicMock
+from mock import patch
+from fixtures import BotoSessionFixture, clone_test_state  # XXX: better name
 
 from greengo import greengo
 from greengo.state import State
@@ -10,64 +10,14 @@ from greengo.entity import Entity
 
 # Do not override the production state, work with testing state.
 greengo.STATE_FILE = '.gg_state_test.json'
-state = None
 
 TEST_KEY_PATH = "tests/certs"
 TEST_CONFIG_PATH = "tests/config"
 
 
-@pytest.fixture(scope="session", autouse=True)
-def load_state(request):
-    # Load test state once per session.
-    global state
-    state = greengo.State("tests/test_state.json")
-    print("State fixture loaded for testing!")
-
-
-class SessionFixture():
-    region_name = 'moon-darkside'
-
-    def __init__(self):
-        global state
-
-        self.greengrass = MagicMock()
-        self.greengrass.create_group = MagicMock(
-            return_value=state.get('Group'))
-        self.greengrass.create_core_definition = MagicMock(
-            return_value=state.get('CoreDefinition'))
-
-        subscriptions_return = state.get('Subscriptions').copy()
-        subscription_definition_return = subscriptions_return.pop('LatestVersionDetails')
-
-        self.greengrass.create_subscription_definition = MagicMock(
-            return_value=subscriptions_return)
-        self.greengrass.get_subscription_definition_version = MagicMock(
-            return_value=subscription_definition_return)
-
-        self.iot = MagicMock()
-        self.iot.create_keys_and_certificate = MagicMock(
-            return_value=state.get('Cores')[0]['keys'])
-        self.iot.create_thing = MagicMock(
-            return_value=state.get('Cores')[0]['thing'])
-        self.iot.describe_endpoint = MagicMock(
-            return_value={
-                'endpointAddress': "foobar.iot.{}.amazonaws.com".format(self.region_name)
-            })
-        self.iot.create_policy = MagicMock(
-            return_value=state.get('Cores')[0]['policy'])
-
-    def client(self, name):
-        if name == 'greengrass':
-            return self.greengrass
-        elif name == 'iot':
-            return self.iot
-
-        return MagicMock()
-
-
 class CommandTest(unittest.TestCase):
     def setUp(self):
-        with patch.object(greengo.session, 'Session', SessionFixture):
+        with patch.object(greengo.session, 'Session', BotoSessionFixture):
             self.gg = greengo.Commands()
         self.gg.group['Cores'][0]['key_path'] = TEST_KEY_PATH
         self.gg.group['Cores'][0]['config_path'] = TEST_CONFIG_PATH
@@ -116,8 +66,8 @@ class CommandTest(unittest.TestCase):
     @patch('time.sleep', return_value=None)
     def test_remove(self, s):
         # Tempted to do greengo.State("tests/test_state.json")?
-        # Or use `state`? DONT! `remove` will delete the state fixture file.
-        self.gg.state._state = state._state.copy()
+        # DONT! `remove` will delete the state fixture file.
+        self.gg.state = clone_test_state()
 
         self.gg.remove()
 
@@ -155,17 +105,17 @@ class CommandTest(unittest.TestCase):
             self.assertTrue("already created" in '\n'.join(l.output))
 
     def test_create_subscriptions__create(self):
-        global state
         # Copy over state and remove Subscriptions
-        self.gg.state._state = state._state.copy()
+        self.gg.state = clone_test_state()
         self.gg.state.remove('Subscriptions')
         self.assertIsNone(self.gg.state.get('Subscriptions'))
 
         self.gg.create_subscriptions()
 
+        expected_state = clone_test_state()
         print(self.gg.state.get('Subscriptions'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
-        assert self.gg.state.get('Subscriptions') == state.get('Subscriptions')
+        assert self.gg.state.get('Subscriptions') == expected_state.get('Subscriptions')
 
     # def test_remove_subscriptions(self):
     #     self.gg.remove_subscriptions()
@@ -174,11 +124,8 @@ class CommandTest(unittest.TestCase):
 class EntityTest(unittest.TestCase):
 
     def test_create_group_version__full_state(self):
-        global state
-        with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
-            # Avoid using `state` directly: it'll override the test JSON file.
-            ministate = greengo.State(file=None)
-            ministate._state = state._state.copy()
+        with patch.object(greengo.Entity, '_session', BotoSessionFixture()) as s:
+            ministate = clone_test_state()
             Entity.create_group_version(ministate)
 
             s.greengrass.create_group_version.assert_called_once()
@@ -196,7 +143,7 @@ class EntityTest(unittest.TestCase):
             self.assertEqual(set(expected_keys), set(kwargs.keys()))
 
     def test_create_group_version__empty_state(self):
-        with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
+        with patch.object(greengo.Entity, '_session', BotoSessionFixture()) as s:
             ministate = greengo.State(file=None)
             ministate._state = {'Group': {'Id': '123'}}
 
