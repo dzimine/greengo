@@ -1,64 +1,24 @@
 import os
 import shutil
-import unittest
-import pytest
-from mock import patch, MagicMock
+import unittest2 as unittest
+from mock import patch
+from fixtures import BotoSessionFixture, clone_test_state  # XXX: better name
 
 from greengo import greengo
+from greengo.state import State
 from greengo.entity import Entity
 
 # Do not override the production state, work with testing state.
 greengo.STATE_FILE = '.gg_state_test.json'
-state = None
 
 TEST_KEY_PATH = "tests/certs"
 TEST_CONFIG_PATH = "tests/config"
 
 
-@pytest.fixture(scope="session", autouse=True)
-def load_state(request):
-    # Load test state once per session.
-    global state
-    state = greengo.State("tests/test_state.json")
-    print("State fixture loaded for testing!")
-
-
-class SessionFixture():
-    region_name = 'moon-darkside'
-
-    def __init__(self):
-        global state
-
-        self.greengrass = MagicMock()
-        self.greengrass.create_group = MagicMock(
-            return_value=state.get('Group'))
-        self.greengrass.create_core_definition = MagicMock(
-            return_value=state.get('CoreDefinition'))
-
-        self.iot = MagicMock()
-        self.iot.create_keys_and_certificate = MagicMock(
-            return_value=state.get('Cores')[0]['keys'])
-        self.iot.create_thing = MagicMock(
-            return_value=state.get('Cores')[0]['thing'])
-        self.iot.describe_endpoint = MagicMock(
-            return_value={
-                'endpointAddress': "foobar.iot.{}.amazonaws.com".format(self.region_name)
-            })
-        self.iot.create_policy = MagicMock(
-            return_value=state.get('Cores')[0]['policy'])
-
-    def client(self, name):
-        if name == 'greengrass':
-            return self.greengrass
-        elif name == 'iot':
-            return self.iot
-
-        return MagicMock()
-
-
 class CommandTest(unittest.TestCase):
     def setUp(self):
-        with patch.object(greengo.session, 'Session', SessionFixture):
+        with patch.object(greengo.session, 'Session', BotoSessionFixture) as f:
+            self.boto_session = f
             self.gg = greengo.Commands()
         self.gg.group['Cores'][0]['key_path'] = TEST_KEY_PATH
         self.gg.group['Cores'][0]['config_path'] = TEST_CONFIG_PATH
@@ -107,29 +67,86 @@ class CommandTest(unittest.TestCase):
     @patch('time.sleep', return_value=None)
     def test_remove(self, s):
         # Tempted to do greengo.State("tests/test_state.json")?
-        # Or use `state`? DONT! `remove` will delete the state fixture file.
-        self.gg.state._state = state._state.copy()
+        # DONT! `remove` will delete the state fixture file.
+        self.gg.state = clone_test_state()
 
         self.gg.remove()
+
+        self.assertFalse(self.gg.state.get())
+
+        # TODO: assert that fnctions were called...
 
     def test_remove__nothing(self):
         self.assertFalse(self.gg.remove())
 
-    # def test_create_subscriptions(self):
-    #     self.gg.create_subscriptions()
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__no_group(self, fm):
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+            self.assertFalse(fm.called)
+            self.assertTrue("Group must be created before Subscriptions" in '\n'.join(l.output))
 
-    # def test_remove_subscriptions(self):
-    #     self.gg.remove_subscriptions()
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__not_defined(self, fm):
+        self.gg.group.pop('Subscriptions')
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("skipping" in '\n'.join(l.output))
+
+    @patch('greengo.subscriptions.Subscriptions._do_create')
+    def test_create_subscriptions__already_created(self, fm):
+        # Pretend that it's already created
+        self.gg.state.update('Group', "not_empty")
+        self.gg.state.update('Subscriptions', "not_empty")
+
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.create_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("already created" in '\n'.join(l.output))
+
+    def test_create_subscriptions__create(self):
+        # Copy over state and remove Subscriptions
+        self.gg.state = clone_test_state()
+        self.gg.state.remove('Subscriptions')
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+
+        self.gg.create_subscriptions()
+
+        expected_state = clone_test_state()
+        self.assertIsNotNone(self.gg.state.get('Subscriptions'))
+        assert self.gg.state.get('Subscriptions') == expected_state.get('Subscriptions')
+
+    @patch('greengo.subscriptions.Subscriptions._do_remove')
+    def test_remove_subscriptions__missing(self, fm):
+        # Copy over state and remove Subscriptions
+        self.gg.state = clone_test_state()
+        self.gg.state.remove('Subscriptions')
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.remove_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("does not exist" in '\n'.join(l.output))
+
+    def test_remove_subscriptions(self):
+        self.gg.state = clone_test_state()
+        expected_id = self.gg.state.get('Subscriptions.Id')
+
+        self.gg.remove_subscriptions()
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+        print Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
+            SubscriptionDefinitionId=expected_id)
 
 
 class EntityTest(unittest.TestCase):
 
     def test_create_group_version__full_state(self):
-        global state
-        with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
-            # Avoid using `state` directly: it'll override the test JSON file.
-            ministate = greengo.State(file=None)
-            ministate._state = state._state.copy()
+        with patch.object(greengo.Entity, '_session', BotoSessionFixture()) as s:
+            ministate = clone_test_state()
             Entity.create_group_version(ministate)
 
             s.greengrass.create_group_version.assert_called_once()
@@ -147,7 +164,7 @@ class EntityTest(unittest.TestCase):
             self.assertEqual(set(expected_keys), set(kwargs.keys()))
 
     def test_create_group_version__empty_state(self):
-        with patch.object(greengo.Entity, '_session', SessionFixture()) as s:
+        with patch.object(greengo.Entity, '_session', BotoSessionFixture()) as s:
             ministate = greengo.State(file=None)
             ministate._state = {'Group': {'Id': '123'}}
 
@@ -155,3 +172,15 @@ class EntityTest(unittest.TestCase):
 
             s.greengrass.create_group_version.assert_called_once_with(
                 GroupId='123')
+
+    @patch('greengo.entity.Entity._do_create')
+    def test_create_entity__missed_requirements(self, fm):
+        e = Entity({'Entity': "something"}, State(file=None))
+        e.type = "Entity"
+        e._requirements = ['Group', 'Lambdas']
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            e.create()
+            self.assertFalse(fm.called)
+            output = '\n'.join(l.output)
+            assert "Group" in output
+            assert "Lambdas" in output

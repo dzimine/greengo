@@ -5,6 +5,7 @@ botocore
 pyyaml
 # Testing requirements
 mock
-pytest
+pytest>=4.0.1
+unittest2
 pytest-flakes
 pytest-cov

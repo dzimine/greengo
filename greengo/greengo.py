@@ -96,11 +96,17 @@ class Commands(object):
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
+    def create_group(self):
+        pass
+
+    def remove_group(self):
+        pass
+
     def create_subscriptions(self, update_group_version=True):
-        log.info("Subscription definition created OK!")
+        Subscriptions(self.group, self.state).create(update_group_version=True)
 
     def remove_subscriptions(self):
-        log.info("Subscription definition removed OK!")
+        Subscriptions(self.group, self.state).remove()
 
 
 def main():

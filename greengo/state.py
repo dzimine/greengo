@@ -59,6 +59,10 @@ class State(object):
         tree[prev] = body
         self.save()
 
+    def entities(self):
+        ''' Get list of entities - top level keys '''
+        return self._state.keys()
+
     def get(self, key=None, default=None):
         '''
         Get value. Key may be nested using dot as separator, like 'foo.bar.buz'.

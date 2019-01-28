@@ -24,41 +24,61 @@ class Entity(object):
         # Note that it's list of Types (classes), not instances.
         self._requirements = []
 
-    def _pre_create(self, update_group_version=True):
+    def _pre_create(self):
         log.info("Creating {}...".format(self.type.lower()))
-        # check if requred objects alrady created, if not, warn and exit.
-        # do the work of your own creation
-        # update requirements
-        for r in self._requirements:
-            r.add_dependant(self)
-        # add yourself to State
-        # Write to file
-        pass
 
-    def _do_create(self, update_group_version):
+        if not self._group.get(self.type):
+            log.warning("{} not defined, skipping.".format(self.type))
+            return False
+
+        if self._state.get(self.type):
+            log.warning("{} already created. Remove before creating again.".format(self.type))
+            return False
+
+        # Check if requred objects alrady created, if not - warn and exit.
+        missed = [r for r in self._requirements if r not in self._state.entities()]
+        if missed:
+            log.warning("{} must be created before {}. Please create first.".format(
+                ', '.join(missed), self.type))
+            return False
+
+        return True
+
+    def _do_create(self):
         raise NotImplementedError
 
-    def _post_create(self):
+    def _post_create(self, update_group_version):
+        if update_group_version:
+            log.info("Updating group version with new {}...".format(self.type))
+            self.create_group_version(self._state)
+
         log.info("{} created OK!".format(self.type))
 
     def create(self, update_group_version=True):
-        self._pre_create()
-        self._do_create(update_group_version)
-        self._post_create()
+        if self._pre_create():
+            self._do_create()
+            self._post_create(update_group_version)
 
     def _pre_remove(self):
         log.info("Removing {}".format(self.type.lower()))
+
+        if not self._state.get(self.type):
+            log.warning("{} does not exist, skipping remove.".format(self.type))
+            return False
+
+        return True
 
     def _do_remove(self):
         raise NotImplementedError
 
     def _post_remove(self):
+        self._state.remove(self.type)
         log.info("{} removed OK!".format(self.type.lower()))
 
     def remove(self):
-        self._pre_remove()
-        self._do_remove()
-        self._post_remove
+        if self._pre_remove():
+            self._do_remove()
+            self._post_remove()
 
     def add_dependant(self, entity):
         self._dependants.add(entity)
@@ -89,5 +109,4 @@ class Entity(object):
         _gg = Entity._session.client("greengrass")
         group_ver = _gg.create_group_version(**args)
 
-        # TODO:XXX refactor state and save nested keys.
         state.update('Group.Version', group_ver)
