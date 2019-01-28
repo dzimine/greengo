@@ -45,7 +45,10 @@ class Subscriptions(Entity):
         self._state.update('Subscriptions.LatestVersionDetails', sub_def_ver)
 
     def _do_remove(self):
-        pass
+        log.debug("Deleting subscription definition '{0}' Id='{1}".format(
+            self.name, self._state.get('Subscriptions.Id')))
+        self._gg.delete_subscription_definition(
+            SubscriptionDefinitionId=self._state.get('Subscriptions.Id'))
 
     def _resolve_subscription_destination(self, d):
         p = [x.strip() for x in d.split('::')]

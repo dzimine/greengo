@@ -17,7 +17,8 @@ TEST_CONFIG_PATH = "tests/config"
 
 class CommandTest(unittest.TestCase):
     def setUp(self):
-        with patch.object(greengo.session, 'Session', BotoSessionFixture):
+        with patch.object(greengo.session, 'Session', BotoSessionFixture) as f:
+            self.boto_session = f
             self.gg = greengo.Commands()
         self.gg.group['Cores'][0]['key_path'] = TEST_KEY_PATH
         self.gg.group['Cores'][0]['config_path'] = TEST_CONFIG_PATH
@@ -71,6 +72,8 @@ class CommandTest(unittest.TestCase):
 
         self.gg.remove()
 
+        self.assertFalse(self.gg.state.get())
+
         # TODO: assert that fnctions were called...
 
     def test_remove__nothing(self):
@@ -113,12 +116,30 @@ class CommandTest(unittest.TestCase):
         self.gg.create_subscriptions()
 
         expected_state = clone_test_state()
-        print(self.gg.state.get('Subscriptions'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
         assert self.gg.state.get('Subscriptions') == expected_state.get('Subscriptions')
 
-    # def test_remove_subscriptions(self):
-    #     self.gg.remove_subscriptions()
+    @patch('greengo.subscriptions.Subscriptions._do_remove')
+    def test_remove_subscriptions__missing(self, fm):
+        # Copy over state and remove Subscriptions
+        self.gg.state = clone_test_state()
+        self.gg.state.remove('Subscriptions')
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+
+        with self.assertLogs('greengo.entity', level='WARNING') as l:
+            self.gg.remove_subscriptions()
+
+            self.assertFalse(fm.called)
+            self.assertTrue("does not exist" in '\n'.join(l.output))
+
+    def test_remove_subscriptions(self):
+        self.gg.state = clone_test_state()
+        expected_id = self.gg.state.get('Subscriptions.Id')
+
+        self.gg.remove_subscriptions()
+        self.assertIsNone(self.gg.state.get('Subscriptions'))
+        print Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
+            SubscriptionDefinitionId=expected_id)
 
 
 class EntityTest(unittest.TestCase):

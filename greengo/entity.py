@@ -62,6 +62,12 @@ class Entity(object):
     def _pre_remove(self):
         log.info("Removing {}".format(self.type.lower()))
 
+        if not self._state.get(self.type):
+            log.warning("{} does not exist, skipping remove.".format(self.type))
+            return False
+
+        return True
+
     def _do_remove(self):
         raise NotImplementedError
 
@@ -70,9 +76,9 @@ class Entity(object):
         log.info("{} removed OK!".format(self.type.lower()))
 
     def remove(self):
-        self._pre_remove()
-        self._do_remove()
-        self._post_remove
+        if self._pre_remove():
+            self._do_remove()
+            self._post_remove()
 
     def add_dependant(self, entity):
         self._dependants.add(entity)

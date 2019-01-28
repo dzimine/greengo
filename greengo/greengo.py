@@ -106,7 +106,7 @@ class Commands(object):
         Subscriptions(self.group, self.state).create(update_group_version=True)
 
     def remove_subscriptions(self):
-        log.info("Subscription definition removed OK!")
+        Subscriptions(self.group, self.state).remove()
 
 
 def main():
