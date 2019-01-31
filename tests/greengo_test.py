@@ -2,7 +2,7 @@ import os
 import shutil
 import unittest2 as unittest
 from mock import patch
-from fixtures import BotoSessionFixture, clone_test_state  # XXX: better name
+from fixtures import BotoSessionFixture, clone_test_state
 
 from greengo import greengo
 from greengo.state import State

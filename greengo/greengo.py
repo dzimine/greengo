@@ -12,6 +12,7 @@ from __init__ import __version__
 from entity import Entity
 from state import State
 from group import Group
+from lambdas import Lambdas
 from subscriptions import Subscriptions
 
 logging.basicConfig(
@@ -42,13 +43,7 @@ class Commands(object):
         log.info("AWS credentials found for region '{}'".format(self._region))
 
         Entity._session = s
-
-        # XXX: remvoe this
-        self._gg = s.client("greengrass")
-        self._iot = s.client("iot")
-        self._lambda = s.client("lambda")
-        self._iam = s.client("iam")
-        self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
+        # self._iot_endpoint = s.client("iot").describe_endpoint()['endpointAddress']
 
         try:
             with open(DEFINITION_FILE, 'r') as f:
@@ -75,6 +70,8 @@ class Commands(object):
 
         Group(self.group, self.state).create(update_group_version=False)
 
+        Lambdas(self.group, self.state).create(update_group_version=False)
+
         Subscriptions(self.group, self.state).create(update_group_version=False)
 
         # Create other entities like this...
@@ -97,13 +94,19 @@ class Commands(object):
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
     def create_group(self):
-        pass
+        NotImplementedError
 
     def remove_group(self):
-        pass
+        NotImplementedError
+
+    def create_lambdas(self, update_group_version=True):
+        Lambdas(self.group, self.state).create(update_group_version=True)
 
     def create_subscriptions(self, update_group_version=True):
         Subscriptions(self.group, self.state).create(update_group_version=True)
+
+    def remove_lambdas(self):
+        raise NotImplementedError
 
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()

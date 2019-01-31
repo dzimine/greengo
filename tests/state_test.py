@@ -53,6 +53,13 @@ class StateTest(unittest.TestCase):
         self.state.remove()
         self.assertDictEqual({}, self.state.get())
 
+    def test_append(self):
+        # There's no `append` method but here is the way to append or overwise
+        # manipulate lists inside State.
+        self.state.update('list', [1, 2, 3])
+        self.state.get('list').append(4)
+        self.assertListEqual(self.state.get('list'), [1, 2, 3, 4])
+
 
 class StateTestWithFile(unittest.TestCase):
     def setUp(self):
