@@ -79,3 +79,35 @@ class LambdasTest(unittest.TestCase):
         la._iam.create_role = MagicMock(side_effect=error)
         arn = la._default_lambda_role_arn()  # Doesn't blow up
         self.assertIsNotNone(arn)
+
+    def test_lambda_remove(self):
+        group = yaml.load(lambdas_yaml)
+        state = clone_test_state()
+        self.assertTrue(state.get('Lambdas'))
+        self.assertTrue(state.get('FunctionDefinition'))
+        self.assertTrue(state.get('LambdaRole'))
+
+        la = Lambdas(group, state)
+
+        with patch('os.remove'):
+            # import pdb; pdb.set_trace()
+            la._do_remove()
+
+        self.assertTrue(la._lambda.delete_function.called)
+        self.assertTrue(la._gg.delete_function_definition.called)
+        self.assertFalse(state.get('Lambdas'))
+        self.assertFalse(state.get('FunctionDefinition'))
+        self.assertFalse(state.get('LambdaRole'))
+
+    def test_lambda_remove__no_function_definitions(self):
+        group = yaml.load(lambdas_yaml)
+        state = clone_test_state()
+        self.assertTrue(state.get('Lambdas'))
+        state.remove('FunctionDefinition')
+
+        la = Lambdas(group, state)
+        with patch('os.remove'):
+            la._do_remove()
+
+        self.assertTrue(la._lambda.delete_function.called)
+        self.assertFalse(la._gg.delete_function_definition.called)

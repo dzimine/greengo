@@ -102,6 +102,28 @@ class Lambdas(Entity):
 
         self._state.update('FunctionDefinition.LatestVersionDetails', rinse(fd_ver))
 
+    def _do_remove(self):
+
+        if not self._state.get('FunctionDefinition'):
+            log.warning("Function definition was not created. Moving on...")
+        else:
+            fd_name = self._state.get('FunctionDefinition.Name')
+            fd_id = self._state.get('FunctionDefinition.Id')
+            log.info("Deleting function definition '{0}' Id='{1}".format(fd_name, fd_id))
+            self._gg.delete_function_definition(FunctionDefinitionId=fd_id)
+            self._state.remove('FunctionDefinition')
+
+        log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
+        self._remove_default_lambda_role()
+        self._state.remove('LambdaRole')
+
+        for l in self._state.get('Lambdas'):
+            log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
+            self._lambda.delete_function(FunctionName=l['FunctionName'])
+            os.remove(l['ZipPath'])
+
+        self._state.remove('Lambdas')
+
     def _default_lambda_role_arn(self):
         if self._state.get('LambdaRole'):
             log.info("Default lambda role '{0}' already creted, RoleId={1} ".format(
