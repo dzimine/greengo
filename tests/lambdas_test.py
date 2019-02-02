@@ -1,7 +1,6 @@
 import unittest2 as unittest
 import yaml
 from mock import patch, MagicMock
-import logging
 from botocore.exceptions import ClientError
 
 from fixtures import BotoSessionFixture, clone_test_state
@@ -9,9 +8,9 @@ from greengo import greengo
 from greengo.lambdas import Lambdas
 from greengo.state import State
 
-logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
-    level=logging.DEBUG)
+# logging.basicConfig(
+#     format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+#     level=logging.DEBUG)
 
 # Do not override the production state, work with testing state.
 greengo.STATE_FILE = '.gg_state_test.json'

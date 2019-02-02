@@ -1,26 +1,18 @@
 import os
 import fire
 import yaml
-# import shutil
-# import urllib
 import logging
 from boto3 import session
-# from botocore.exceptions import ClientError
 
 from __init__ import __version__
 
-from entity import Entity
+from .entity import Entity
 from state import State
 from group import Group
 from lambdas import Lambdas
 from subscriptions import Subscriptions
 
-logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
-    level=logging.WARNING)
-
-log = logging.getLogger('greengo')
-log.setLevel(logging.DEBUG)
+log = logging.getLogger(__name__)
 
 
 DEFINITION_FILE = 'greengo.yaml'
@@ -106,13 +98,17 @@ class Commands(object):
         Subscriptions(self.group, self.state).create(update_group_version=True)
 
     def remove_lambdas(self):
-        raise NotImplementedError
+        Lambdas(self.group, self.state).remove()
 
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()
 
 
 def main():
+    logging.basicConfig(
+        format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+        level=logging.WARNING)
+    logging.getLogger('greengo').setLevel(logging.DEBUG)
     fire.Fire(Commands)
 
 if __name__ == '__main__':

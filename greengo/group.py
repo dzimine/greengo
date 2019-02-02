@@ -8,9 +8,6 @@ from utils import rinse, mkdir, save_keys
 
 log = logging.getLogger(__name__)
 
-# TODO(dzimine): move to proper logger config
-log.setLevel(logging.DEBUG)
-
 
 class Group(Entity):
 

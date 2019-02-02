@@ -1,13 +1,12 @@
 import unittest
 import shutil
 import os
-import logging
 
 from greengo import utils
 
-logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
-    level=logging.DEBUG)
+# logging.basicConfig(
+#     format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+#     level=logging.DEBUG)
 
 TEST_KEY_PATH = "tests/certs"
 
