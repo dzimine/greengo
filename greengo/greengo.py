@@ -53,6 +53,9 @@ class Commands(object):
     def version(self):
         print('Greengo version {}'.format(__version__))
 
+    def state(self):
+        print(self.state)
+
     def create(self):
         if self.state.get():
             log.error("Previously created group exists. Remove before creating!")
@@ -79,26 +82,32 @@ class Commands(object):
 
         log.info("[BEGIN] removing group {0}".format(self.group['Group']['name']))
 
-        Group(self.group, self.state).remove()
+        Subscriptions(self.group, self.state).remove(update_group_version=False)
+
+        Lambdas(self.group, self.state).remove(update_group_version=False)
+
+        # Remove other entities here, before removing Group.
+
+        Group(self.group, self.state).remove(update_group_version=False)
 
         self.state.remove()
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
     def create_group(self):
-        NotImplementedError
+        Group(self.group, self.state).create()
 
     def remove_group(self):
-        NotImplementedError
+        Group(self.group, self.state).remove()
 
-    def create_lambdas(self, update_group_version=True):
-        Lambdas(self.group, self.state).create(update_group_version=True)
-
-    def create_subscriptions(self, update_group_version=True):
-        Subscriptions(self.group, self.state).create(update_group_version=True)
+    def create_lambdas(self):
+        Lambdas(self.group, self.state).create()
 
     def remove_lambdas(self):
         Lambdas(self.group, self.state).remove()
+
+    def create_subscriptions(self):
+        Subscriptions(self.group, self.state).create()
 
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()

@@ -120,7 +120,10 @@ class Lambdas(Entity):
         for l in self._state.get('Lambdas'):
             log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
             self._lambda.delete_function(FunctionName=l['FunctionName'])
-            os.remove(l['ZipPath'])
+            try:
+                os.remove(l['ZipPath'])
+            except OSError as e:
+                log.warning("Failed to remove local Lambda zip package: {}".format(e))
 
         self._state.remove('Lambdas')
 

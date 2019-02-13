@@ -41,6 +41,11 @@ class State(object):
             utils.mkdir(os.path.dirname(self._file))
             self.save()
 
+    def __str__(self):
+        if not self._state:
+            return "State not created."
+        return utils.pretty(self._state)
+
     def exists(self):
         return bool(self._state)
 
