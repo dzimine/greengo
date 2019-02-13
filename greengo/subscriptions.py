@@ -78,7 +78,7 @@ class Subscriptions(Entity):
         raise NotImplementedError("WIP: Devices not implemented yet.")
 
     def _lookup_connector_arn(self, name):
-        for l in self._state('Connectors.LatestVersionDetails.Definition.Connectors'):
+        for l in self._state.get('Connectors.LatestVersionDetails.Definition.Connectors'):
             if l['Id'] == name:
                 return l['ConnectorArn']
         log.error("Connector '{0}' not found".format(name))
