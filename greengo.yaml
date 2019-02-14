@@ -9,6 +9,7 @@ Cores:
 
 Lambdas:
   - name: GreengrassHelloWorld
+    runtime: python2.7
     handler: function.handler
     package: lambdas/GreengrassHelloWorld
     alias: dev

@@ -24,6 +24,14 @@ class Entity(object):
         # Note that it's list of Types (classes), not instances.
         self._requirements = []
 
+    def add_dependant(self, entity):
+        self._dependants.add(entity)
+
+    def create(self, update_group_version=True):
+        if self._pre_create():
+            self._do_create()
+            self._post_create(update_group_version)
+
     def _pre_create(self):
         log.info("Creating {}...".format(self.type.lower()))
 
@@ -54,10 +62,10 @@ class Entity(object):
 
         log.info("{} created OK!".format(self.type))
 
-    def create(self, update_group_version=True):
-        if self._pre_create():
-            self._do_create()
-            self._post_create(update_group_version)
+    def remove(self, update_group_version=True):
+        if self._pre_remove():
+            self._do_remove()
+            self._post_remove(update_group_version)
 
     def _pre_remove(self):
         log.info("Removing {}".format(self.type.lower()))
@@ -71,20 +79,20 @@ class Entity(object):
     def _do_remove(self):
         raise NotImplementedError
 
-    def _post_remove(self):
+    def _post_remove(self, update_group_version):
         self._state.remove(self.type)
+        if update_group_version:
+            log.info("Updating group version with {} removed...".format(self.type))
+            self.create_group_version(self._state)
+
         log.info("{} removed OK!".format(self.type.lower()))
-
-    def remove(self):
-        if self._pre_remove():
-            self._do_remove()
-            self._post_remove()
-
-    def add_dependant(self, entity):
-        self._dependants.add(entity)
 
     @classmethod
     def create_group_version(klass, state):
+        if not state.get('Group.Id'):
+            log.debug("Attempting to update group version but the group doesn't exist, skipping!")
+            return
+
         # Compile a list of non-empty arguments from the super-set,
         # https://docs.aws.amazon.com/greengrass/latest/apireference/definitions-groupversion.html
         kwargs = dict(

@@ -2,7 +2,7 @@ import os
 import shutil
 import unittest2 as unittest
 from mock import patch
-from fixtures import BotoSessionFixture, clone_test_state  # XXX: better name
+from fixtures import BotoSessionFixture, clone_test_state
 
 from greengo import greengo
 from greengo.state import State
@@ -17,8 +17,7 @@ TEST_CONFIG_PATH = "tests/config"
 
 class CommandTest(unittest.TestCase):
     def setUp(self):
-        with patch.object(greengo.session, 'Session', BotoSessionFixture) as f:
-            self.boto_session = f
+        with patch.object(greengo.session, 'Session', BotoSessionFixture):
             self.gg = greengo.Commands()
         self.gg.group['Cores'][0]['key_path'] = TEST_KEY_PATH
         self.gg.group['Cores'][0]['config_path'] = TEST_CONFIG_PATH
@@ -65,7 +64,7 @@ class CommandTest(unittest.TestCase):
         self.assertFalse(r)
 
     @patch('time.sleep', return_value=None)
-    def test_remove(self, s):
+    def test_remove__all(self, s):
         # Tempted to do greengo.State("tests/test_state.json")?
         # DONT! `remove` will delete the state fixture file.
         self.gg.state = clone_test_state()
@@ -74,10 +73,45 @@ class CommandTest(unittest.TestCase):
 
         self.assertFalse(self.gg.state.get())
 
-        # TODO: assert that fnctions were called...
+        # Assert that SOME entities were removed
+        gg = greengo.Entity._session.greengrass
+        iot = greengo.Entity._session.iot
+        # Lambdas
+        self.assertTrue(gg.delete_function_definition.called)
+        # Subscriptions
+        self.assertTrue(gg.delete_subscription_definition.called)
+        # Core
+        self.assertTrue(gg.delete_core_definition.called)
+        self.assertTrue(iot.delete_thing)
+        # Group
+        self.assertTrue(gg.delete_group.called)
 
     def test_remove__nothing(self):
         self.assertFalse(self.gg.remove())
+
+    @patch('time.sleep', return_value=None)
+    def test_deploy__success(self, s):
+        self.gg.state = clone_test_state()
+
+        gg = self.gg._session.greengrass
+        gg.create_deployment.return_value = {'DeploymentId': '123'}
+        gg.get_deployment_status.return_value = {'DeploymentStatus': 'Success'}
+        self.gg.deploy()
+
+        self.assertTrue(gg.create_deployment.called)
+        self.assertEqual(self.gg.state.get('Deployment.Status.DeploymentStatus'), 'Success')
+
+    @patch('time.sleep', return_value=None)
+    def test_deploy__error(self, s):
+        self.gg.state = clone_test_state()
+
+        gg = self.gg._session.greengrass
+        gg.get_deployment_status.side_effect = (
+            {'DeploymentStatus': 'Building'},
+            {'DeploymentStatus': 'InProgress'},
+            {'DeploymentStatus': 'Failure', 'ErrorMessage': "Mock error"}
+        )
+        self.gg.deploy()
 
     @patch('greengo.subscriptions.Subscriptions._do_create')
     def test_create_subscriptions__no_group(self, fm):
@@ -163,7 +197,7 @@ class EntityTest(unittest.TestCase):
             ]
             self.assertEqual(set(expected_keys), set(kwargs.keys()))
 
-    def test_create_group_version__empty_state(self):
+    def test_create_group_version__state_group_only(self):
         with patch.object(greengo.Entity, '_session', BotoSessionFixture()) as s:
             ministate = greengo.State(file=None)
             ministate._state = {'Group': {'Id': '123'}}
@@ -172,6 +206,14 @@ class EntityTest(unittest.TestCase):
 
             s.greengrass.create_group_version.assert_called_once_with(
                 GroupId='123')
+
+    def test_create_group_version__empty_state(self):
+        with self.assertLogs('greengo.entity', level='DEBUG') as l:
+
+            ministate = greengo.State(file=None)
+            Entity.create_group_version(ministate)
+            output = '\n'.join(l.output)
+            assert "Attempting to update group version" in output
 
     @patch('greengo.entity.Entity._do_create')
     def test_create_entity__missed_requirements(self, fm):

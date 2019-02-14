@@ -1,26 +1,20 @@
 import os
 import fire
 import yaml
-# import shutil
-# import urllib
 import logging
+import time
 from boto3 import session
-# from botocore.exceptions import ClientError
 
 from __init__ import __version__
 
-from entity import Entity
+from utils import rinse
+from .entity import Entity
 from state import State
 from group import Group
+from lambdas import Lambdas
 from subscriptions import Subscriptions
 
-logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
-    level=logging.WARNING)
-
-log = logging.getLogger('greengo')
-log.setLevel(logging.DEBUG)
-
+log = logging.getLogger(__name__)
 
 DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
@@ -42,13 +36,8 @@ class Commands(object):
         log.info("AWS credentials found for region '{}'".format(self._region))
 
         Entity._session = s
-
-        # XXX: remvoe this
-        self._gg = s.client("greengrass")
-        self._iot = s.client("iot")
-        self._lambda = s.client("lambda")
-        self._iam = s.client("iam")
-        self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
+        self._session = s
+        # self._iot_endpoint = s.client("iot").describe_endpoint()['endpointAddress']
 
         try:
             with open(DEFINITION_FILE, 'r') as f:
@@ -66,6 +55,9 @@ class Commands(object):
     def version(self):
         print('Greengo version {}'.format(__version__))
 
+    def state(self):
+        print(self.state)
+
     def create(self):
         if self.state.get():
             log.error("Previously created group exists. Remove before creating!")
@@ -74,6 +66,8 @@ class Commands(object):
         log.info("[BEGIN] creating group {0}".format(self.group['Group']['name']))
 
         Group(self.group, self.state).create(update_group_version=False)
+
+        Lambdas(self.group, self.state).create(update_group_version=False)
 
         Subscriptions(self.group, self.state).create(update_group_version=False)
 
@@ -90,26 +84,80 @@ class Commands(object):
 
         log.info("[BEGIN] removing group {0}".format(self.group['Group']['name']))
 
-        Group(self.group, self.state).remove()
+        Subscriptions(self.group, self.state).remove(update_group_version=False)
+
+        Lambdas(self.group, self.state).remove(update_group_version=False)
+
+        # Remove other entities here, before removing Group.
+
+        Group(self.group, self.state).remove(update_group_version=False)
 
         self.state.remove()
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
 
     def create_group(self):
-        pass
+        Group(self.group, self.state).create()
 
     def remove_group(self):
-        pass
+        Group(self.group, self.state).remove()
 
-    def create_subscriptions(self, update_group_version=True):
-        Subscriptions(self.group, self.state).create(update_group_version=True)
+    def create_lambdas(self):
+        Lambdas(self.group, self.state).create()
+
+    def remove_lambdas(self):
+        Lambdas(self.group, self.state).remove()
+
+    def create_subscriptions(self):
+        Subscriptions(self.group, self.state).create()
 
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()
 
+    def deploy(self):
+        if not self.state:
+            log.info("There is nothing to deploy. Do create first.")
+            return
+
+        log.info("Deploying group '{0}'".format(self.state.get('Group.Name')))
+        gg = self._session.client("greengrass")
+        deployment = gg.create_deployment(
+            GroupId=self.state.get('Group.Id'),
+            GroupVersionId=self.state.get('Group.Version.Version'),
+            DeploymentType="NewDeployment")
+        self.state.update('Deployment', rinse(deployment))
+
+        for i in range(DEPLOY_TIMEOUT / 2):
+            time.sleep(2)
+            deployment_status = gg.get_deployment_status(
+                GroupId=self.state.get('Group.Id'),
+                DeploymentId=deployment['DeploymentId'])
+
+            status = deployment_status.get('DeploymentStatus')
+
+            log.debug("--- deploying... status: {0}".format(status))
+            # Known status values: ['Building | InProgress | Success | Failure']
+            if status == 'Success':
+                log.info("--- SUCCESS!")
+                self.state.update('Deployment.Status', rinse(deployment_status))
+                return
+            elif status == 'Failure':
+                log.error("--- ERROR! {0}".format(deployment_status['ErrorMessage']))
+                self.state.update('Deployment.Status', rinse(deployment_status))
+                return
+
+        log.warning(
+            "--- Gave up waiting for deployment. Please check the status later. "
+            "Make sure GreenGrass Core is running, connected to network, "
+            "and the certificates match.")
+
 
 def main():
+    logging.basicConfig(
+        format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+        level=logging.WARNING)
+    logging.getLogger('greengo').setLevel(logging.DEBUG)
+    logging.getLogger('__main__').setLevel(logging.DEBUG)  # There is a beter way...
     fire.Fire(Commands)
 
 if __name__ == '__main__':
