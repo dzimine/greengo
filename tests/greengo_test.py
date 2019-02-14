@@ -89,6 +89,30 @@ class CommandTest(unittest.TestCase):
     def test_remove__nothing(self):
         self.assertFalse(self.gg.remove())
 
+    @patch('time.sleep', return_value=None)
+    def test_deploy__success(self, s):
+        self.gg.state = clone_test_state()
+
+        gg = self.gg._session.greengrass
+        gg.create_deployment.return_value = {'DeploymentId': '123'}
+        gg.get_deployment_status.return_value = {'DeploymentStatus': 'Success'}
+        self.gg.deploy()
+
+        self.assertTrue(gg.create_deployment.called)
+        self.assertEqual(self.gg.state.get('Deployment.Status.DeploymentStatus'), 'Success')
+
+    @patch('time.sleep', return_value=None)
+    def test_deploy__error(self, s):
+        self.gg.state = clone_test_state()
+
+        gg = self.gg._session.greengrass
+        gg.get_deployment_status.side_effect = (
+            {'DeploymentStatus': 'Building'},
+            {'DeploymentStatus': 'InProgress'},
+            {'DeploymentStatus': 'Failure', 'ErrorMessage': "Mock error"}
+        )
+        self.gg.deploy()
+
     @patch('greengo.subscriptions.Subscriptions._do_create')
     def test_create_subscriptions__no_group(self, fm):
         with self.assertLogs('greengo.entity', level='WARNING') as l:

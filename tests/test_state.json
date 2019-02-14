@@ -60,6 +60,15 @@
       }
     }
   ],
+  "Deployment": {
+    "DeploymentArn": "arn:aws:greengrass:us-east-1:000000000000:/greengrass/groups/384ddf6c-f562-48bd-b106-45209ba0a89e/deployments/adf6011f-ee23-4df8-9709-55abde819d5b",
+    "DeploymentId": "adf6011f-ee23-4df8-9709-55abde819d5b",
+    "Status": {
+      "DeploymentStatus": "Success",
+      "DeploymentType": "NewDeployment",
+      "UpdatedAt": "2019-02-14T07:18:22.406Z"
+    }
+  },
   "FunctionDefinition": {
     "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/functions/3164383a-7c4c-4533-8fad-a6a451052a4d",
     "CreationTimestamp": "2018-04-04T09:21:44.721Z",

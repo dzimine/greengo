@@ -2,10 +2,12 @@ import os
 import fire
 import yaml
 import logging
+import time
 from boto3 import session
 
 from __init__ import __version__
 
+from utils import rinse
 from .entity import Entity
 from state import State
 from group import Group
@@ -13,7 +15,6 @@ from lambdas import Lambdas
 from subscriptions import Subscriptions
 
 log = logging.getLogger(__name__)
-
 
 DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
@@ -35,6 +36,7 @@ class Commands(object):
         log.info("AWS credentials found for region '{}'".format(self._region))
 
         Entity._session = s
+        self._session = s
         # self._iot_endpoint = s.client("iot").describe_endpoint()['endpointAddress']
 
         try:
@@ -112,12 +114,50 @@ class Commands(object):
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()
 
+    def deploy(self):
+        if not self.state:
+            log.info("There is nothing to deploy. Do create first.")
+            return
+
+        log.info("Deploying group '{0}'".format(self.state.get('Group.Name')))
+        gg = self._session.client("greengrass")
+        deployment = gg.create_deployment(
+            GroupId=self.state.get('Group.Id'),
+            GroupVersionId=self.state.get('Group.Version.Version'),
+            DeploymentType="NewDeployment")
+        self.state.update('Deployment', rinse(deployment))
+
+        for i in range(DEPLOY_TIMEOUT / 2):
+            time.sleep(2)
+            deployment_status = gg.get_deployment_status(
+                GroupId=self.state.get('Group.Id'),
+                DeploymentId=deployment['DeploymentId'])
+
+            status = deployment_status.get('DeploymentStatus')
+
+            log.debug("--- deploying... status: {0}".format(status))
+            # Known status values: ['Building | InProgress | Success | Failure']
+            if status == 'Success':
+                log.info("--- SUCCESS!")
+                self.state.update('Deployment.Status', rinse(deployment_status))
+                return
+            elif status == 'Failure':
+                log.error("--- ERROR! {0}".format(deployment_status['ErrorMessage']))
+                self.state.update('Deployment.Status', rinse(deployment_status))
+                return
+
+        log.warning(
+            "--- Gave up waiting for deployment. Please check the status later. "
+            "Make sure GreenGrass Core is running, connected to network, "
+            "and the certificates match.")
+
 
 def main():
     logging.basicConfig(
         format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
         level=logging.WARNING)
     logging.getLogger('greengo').setLevel(logging.DEBUG)
+    logging.getLogger('__main__').setLevel(logging.DEBUG)  # There is a beter way...
     fire.Fire(Commands)
 
 if __name__ == '__main__':
