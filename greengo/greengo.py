@@ -124,7 +124,7 @@ class GroupCommands(object):
         self.state['Deployment'] = rinse(deployment)
         _update_state(self.state)
 
-        for i in range(DEPLOY_TIMEOUT / 2):
+        for i in range(DEPLOY_TIMEOUT // 2):
             sleep(2)
             deployment_status = self._gg.get_deployment_status(
                 GroupId=self.state['Group']['Id'],
