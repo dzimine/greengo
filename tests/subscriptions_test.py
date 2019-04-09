@@ -2,7 +2,7 @@ import unittest2 as unittest
 import yaml
 from mock import patch
 
-from fixtures import BotoSessionFixture, clone_test_state
+from .fixtures import BotoSessionFixture, clone_test_state
 from greengo import greengo
 from greengo.subscriptions import Subscriptions
 
@@ -63,7 +63,7 @@ class SubscriptionsTest(unittest.TestCase):
         pass
 
     def test_resolve_subscription_destionation(self):
-        group = yaml.load(greengo_yaml)
+        group = yaml.safe_load(greengo_yaml)
         s = Subscriptions(group, clone_test_state())
 
         self.assertEqual(

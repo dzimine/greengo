@@ -1,7 +1,7 @@
-from entity import Entity
 import logging
 
-from utils import pretty, rinse
+from .utils import pretty, rinse
+from .entity import Entity
 
 log = logging.getLogger(__name__)
 

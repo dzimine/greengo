@@ -5,14 +5,14 @@ import logging
 import time
 from boto3 import session
 
-from __init__ import __version__
+from .__init__ import __version__
 
-from utils import rinse
+from .utils import rinse
 from .entity import Entity
-from state import State
-from group import Group
-from lambdas import Lambdas
-from subscriptions import Subscriptions
+from .state import State
+from .group import Group
+from .lambdas import Lambdas
+from .subscriptions import Subscriptions
 
 log = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class Commands(object):
             DeploymentType="NewDeployment")
         self.state.update('Deployment', rinse(deployment))
 
-        for i in range(DEPLOY_TIMEOUT / 2):
+        for i in range(DEPLOY_TIMEOUT // 2):
             time.sleep(2)
             deployment_status = gg.get_deployment_status(
                 GroupId=self.state.get('Group.Id'),

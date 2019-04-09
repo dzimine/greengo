@@ -3,7 +3,7 @@ import errno
 import logging
 import json
 
-import utils
+from . import utils
 
 log = logging.getLogger(__name__)
 

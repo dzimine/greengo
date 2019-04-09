@@ -5,8 +5,8 @@ import json
 from botocore.exceptions import ClientError
 import logging
 
-from entity import Entity
-from utils import pretty, rinse
+from .entity import Entity
+from .utils import pretty, rinse
 
 MAGIC_DIR = '.gg'  # XXX: better way?
 

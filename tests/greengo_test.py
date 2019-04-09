@@ -2,7 +2,7 @@ import os
 import shutil
 import unittest2 as unittest
 from mock import patch
-from fixtures import BotoSessionFixture, clone_test_state
+from .fixtures import BotoSessionFixture, clone_test_state
 
 from greengo import greengo
 from greengo.state import State
@@ -172,8 +172,8 @@ class CommandTest(unittest.TestCase):
 
         self.gg.remove_subscriptions()
         self.assertIsNone(self.gg.state.get('Subscriptions'))
-        print Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
-            SubscriptionDefinitionId=expected_id)
+        print(Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
+            SubscriptionDefinitionId=expected_id))
 
 
 class EntityTest(unittest.TestCase):

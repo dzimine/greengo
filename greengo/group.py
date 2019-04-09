@@ -3,8 +3,8 @@ import json
 import time
 from botocore.exceptions import ClientError
 
-from entity import Entity
-from utils import rinse, mkdir, save_keys
+from .entity import Entity
+from .utils import rinse, mkdir, save_keys
 
 log = logging.getLogger(__name__)
 
