@@ -42,6 +42,7 @@ Lambdas:
 
 class LambdasTest(unittest.TestCase):
     def setUp(self):
+        self.group = yaml.safe_load(lambdas_yaml)
         with patch.object(greengo.session, 'Session', BotoSessionFixture) as f:
             self.boto_session = f
             self.gg = greengo.Commands()
@@ -50,26 +51,26 @@ class LambdasTest(unittest.TestCase):
         pass
 
     def test_lambda_create(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         state = clone_test_state()
         state.remove('Lambdas')
         Lambdas(group, state)._do_create()
 
     def test_default_lambda_role_arn__already_created(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         state = clone_test_state()
         arn = Lambdas(group, state)._default_lambda_role_arn()
         self.assertEqual(arn, state.get('LambdaRole.Role.Arn'))
 
     def test_default_lambda_role_arn__create(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         arn = clone_test_state().get('LambdaRole.Role.Arn')
         state = State(file=None)
         arn = Lambdas(group, state)._default_lambda_role_arn()
         self.assertEqual(arn, state.get('LambdaRole.Role.Arn'))
 
     def test_default_lambda_role_arn__previously_defined(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         la = Lambdas(group, State(file=None))
         error = ClientError(
             error_response={'Error': {'Code': 'EntityAlreadyExists'}},
@@ -80,7 +81,7 @@ class LambdasTest(unittest.TestCase):
         self.assertIsNotNone(arn)
 
     def test_lambda_remove(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         state = clone_test_state()
         self.assertTrue(state.get('Lambdas'))
         self.assertTrue(state.get('FunctionDefinition'))
@@ -99,7 +100,7 @@ class LambdasTest(unittest.TestCase):
         self.assertFalse(state.get('LambdaRole'))
 
     def test_lambda_remove__no_function_definitions(self):
-        group = yaml.load(lambdas_yaml)
+        group = self.group
         state = clone_test_state()
         self.assertTrue(state.get('Lambdas'))
         state.remove('FunctionDefinition')

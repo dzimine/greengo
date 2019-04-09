@@ -63,7 +63,7 @@ class SubscriptionsTest(unittest.TestCase):
         pass
 
     def test_resolve_subscription_destionation(self):
-        group = yaml.load(greengo_yaml)
+        group = yaml.safe_load(greengo_yaml)
         s = Subscriptions(group, clone_test_state())
 
         self.assertEqual(
