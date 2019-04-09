@@ -143,15 +143,23 @@ Clone the project, set up your environment, install dependencies and setup `gree
 ```
 $ git clone https://github.com/dzimine/greengo.git
 $ cd greengo
-$ virtualenv venv
 
+# For python2:
+$ virtualenv venv
 $ . venv/bin/activate
+
+# For python3
+$ python3 -m venv .venv3
+$ . .venv3/bin/activate
+
 $ pip install -r requirements.txt
+
+# Install greengo into the virtualenv
 $ pip install -e .
 ```
 
 Run the unit tests:
 
 ```
-pytest -s
+pytest -s tests/
 ```

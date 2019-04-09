@@ -3,7 +3,7 @@ import yaml
 from mock import patch, MagicMock
 from botocore.exceptions import ClientError
 
-from fixtures import BotoSessionFixture, clone_test_state
+from .fixtures import BotoSessionFixture, clone_test_state
 from greengo import greengo
 from greengo.lambdas import Lambdas
 from greengo.state import State

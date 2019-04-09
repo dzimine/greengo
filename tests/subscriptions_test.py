@@ -2,7 +2,7 @@ import unittest2 as unittest
 import yaml
 from mock import patch
 
-from fixtures import BotoSessionFixture, clone_test_state
+from .fixtures import BotoSessionFixture, clone_test_state
 from greengo import greengo
 from greengo.subscriptions import Subscriptions
 

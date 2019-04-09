@@ -1,6 +1,6 @@
 import logging
 
-from utils import pretty
+from .utils import pretty
 
 log = logging.getLogger(__name__)
 
