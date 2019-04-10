@@ -50,6 +50,8 @@ class Subscriptions(Entity):
         self._gg.delete_subscription_definition(
             SubscriptionDefinitionId=self._state.get('Subscriptions.Id'))
 
+        self._state.remove(self.type)
+
     def _resolve_subscription_destination(self, d):
         p = [x.strip() for x in d.split('::')]
         if p[0] == 'cloud':

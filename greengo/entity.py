@@ -80,7 +80,8 @@ class Entity(object):
         raise NotImplementedError
 
     def _post_remove(self, update_group_version):
-        self._state.remove(self.type)
+        # While we can do self._state.remove(self.type) here,
+        # I concluded it's better to leave it to each entity to deal with it's state.
         if update_group_version:
             log.info("Updating group version with {} removed...".format(self.type))
             self.create_group_version(self._state)

@@ -48,4 +48,4 @@ class Resources(Entity):
         self._gg.delete_resource_definition(
             ResourceDefinitionId=self._state.get('Resources.Id'))
 
-        self._state.remove('Resources')
+        self._state.remove(self.type)
