@@ -43,6 +43,7 @@ class CommandTest(unittest.TestCase):
         self.assertIsNotNone(self.gg.state.get('Cores'))
         self.assertIsNotNone(self.gg.state.get('CoreDefinition'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
+        self.assertIsNotNone(self.gg.state.get('Resources'))
         self.assertIsNotNone(self.gg.state.get('Group.Version'))
 
         # Check that cert and config files have been created
@@ -172,8 +173,8 @@ class CommandTest(unittest.TestCase):
 
         self.gg.remove_subscriptions()
         self.assertIsNone(self.gg.state.get('Subscriptions'))
-        print(Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
-            SubscriptionDefinitionId=expected_id))
+        Entity._session.greengrass.delete_subscription_definition.assert_called_once_with(
+            SubscriptionDefinitionId=expected_id)
 
 
 class EntityTest(unittest.TestCase):

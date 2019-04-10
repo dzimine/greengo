@@ -24,13 +24,21 @@ class BotoSessionFixture():
         self.greengrass.create_core_definition = MagicMock(
             return_value=state.get('CoreDefinition'))
 
-        subscriptions_return = state.get('Subscriptions').copy()
-        subscription_definition_return = subscriptions_return.pop('LatestVersionDetails')
+        subscription_def_return = state.get('Subscriptions').copy()
+        subscription_def_version_return = subscription_def_return.pop('LatestVersionDetails')
 
         self.greengrass.create_subscription_definition = MagicMock(
-            return_value=subscriptions_return)
+            return_value=subscription_def_return)
         self.greengrass.get_subscription_definition_version = MagicMock(
-            return_value=subscription_definition_return)
+            return_value=subscription_def_version_return)
+
+        resource_def_return = state.get('Resources').copy()
+        resource_def_version_return = resource_def_return.pop('LatestVersionDetails')
+
+        self.greengrass.create_resource_definition = MagicMock(
+            return_value=resource_def_return)
+        self.greengrass.get_resource_definition_version = MagicMock(
+            return_value=resource_def_version_return)
 
         function_definition_return = state.get('FunctionDefinition').copy()
         function_definition_version_return = function_definition_return.pop('LatestVersionDetails')

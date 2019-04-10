@@ -13,6 +13,7 @@ from .state import State
 from .group import Group
 from .lambdas import Lambdas
 from .subscriptions import Subscriptions
+from .resources import Resources
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +71,8 @@ class Commands(object):
         Lambdas(self.group, self.state).create(update_group_version=False)
 
         Subscriptions(self.group, self.state).create(update_group_version=False)
+
+        Resources(self.group, self.state).create(update_group_version=False)
 
         # Create other entities like this...
 
