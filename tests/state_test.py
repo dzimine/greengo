@@ -8,7 +8,7 @@ from greengo.state import State
 class StateTest(unittest.TestCase):
     def setUp(self):
         self.state = State(file=None)
-        self.body = {'a': {'b': 'c'}, 'x': {'y': {'z': 1}}}
+        self.body = {'a': {'b': 'c', 'd': 'e'}, 'x': {'y': {'z': 1}}}
         self.state._state = self.body
 
     def tearDown(self):
@@ -52,6 +52,19 @@ class StateTest(unittest.TestCase):
 
         self.state.remove()
         self.assertDictEqual({}, self.state.get())
+
+    def test_remove__nested(self):
+        self.assertEqual(self.body['a']['b'], self.state.get('a.b'))
+        self.state.remove('a.b')
+        self.assertEqual(self.state.get('a.b'), None)
+        self.assertEqual(self.state.get('a.d'), 'e')
+
+        self.state.remove('x.y.z')
+        self.assertEqual(self.state.get('x.y.z'), None)
+
+    def test_remove__nested_missing(self):
+        self.state.remove('key.doesnt.exist')
+        self.state.remove('a.b.key_doesnt_exist')
 
     def test_append(self):
         # There's no `append` method but here is the way to append or overwise

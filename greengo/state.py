@@ -84,7 +84,14 @@ class State(object):
     def remove(self, key=None):
         if key:
             try:
-                self._state.pop(key)
+                (path, dot, k) = key.rpartition('.')
+                if path:
+                    branch = self.get(path)
+                    if not branch or type(branch) is not dict:
+                        raise KeyError
+                    branch.pop(k)
+                else:
+                    self._state.pop(key)
                 self.save()
             except KeyError:
                 log.warning("Can not remove key '{}' from State - missing".format(key))
