@@ -27,7 +27,8 @@ class Lambdas(Entity):
 
     def _do_create(self):
         functions = []
-        self._state.update('Lambdas', [])  # XXX do this better.
+        self._state.update('Lambdas', {})
+        self._state.update('Lambdas.Functions', [])  # XXX do this better.
         for l in self._group['Lambdas']:
             log.info("Creating Lambda function '{0}'".format(l['name']))
 
@@ -67,8 +68,8 @@ class Lambdas(Entity):
 
             lr['ZipPath'] = zf
 
-            self._state.get('Lambdas').append(rinse(lr))
-            self._state.save()  # This only needed as `append` only modified state in memory.
+            self._state.get('Lambdas.Functions').append(rinse(lr))
+            self._state.save()  # This is needed as `append` only modified state in memory.
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
 
             # Auto-created alias uses the version of just published function
@@ -94,30 +95,30 @@ class Lambdas(Entity):
             Name=self.name + '_func_def_1',
             InitialVersion={'Functions': functions}
         )
-        self._state.update('FunctionDefinition', rinse(fd))
+        self._state.update('Lambdas.FunctionDefinition', rinse(fd))
 
         fd_ver = self._gg.get_function_definition_version(
-            FunctionDefinitionId=self._state.get('FunctionDefinition.Id'),
-            FunctionDefinitionVersionId=self._state.get('FunctionDefinition.LatestVersion'))
+            FunctionDefinitionId=self._state.get('Lambdas.FunctionDefinition.Id'),
+            FunctionDefinitionVersionId=self._state.get('Lambdas.FunctionDefinition.LatestVersion'))
 
-        self._state.update('FunctionDefinition.LatestVersionDetails', rinse(fd_ver))
+        self._state.update('Lambdas.FunctionDefinition.LatestVersionDetails', rinse(fd_ver))
 
     def _do_remove(self):
 
-        if not self._state.get('FunctionDefinition'):
+        if not self._state.get('Lambdas.FunctionDefinition'):
             log.warning("Function definition was not created. Moving on...")
         else:
-            fd_name = self._state.get('FunctionDefinition.Name')
-            fd_id = self._state.get('FunctionDefinition.Id')
+            fd_name = self._state.get('Lambdas.FunctionDefinition.Name')
+            fd_id = self._state.get('Lambdas.FunctionDefinition.Id')
             log.info("Deleting function definition '{0}' Id='{1}".format(fd_name, fd_id))
             self._gg.delete_function_definition(FunctionDefinitionId=fd_id)
-            self._state.remove('FunctionDefinition')
+            self._state.remove('Lambdas.FunctionDefinition')
 
         log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
         self._remove_default_lambda_role()
-        self._state.remove('LambdaRole')
+        self._state.remove('Lambdas.LambdaRole')
 
-        for l in self._state.get('Lambdas'):
+        for l in self._state.get('Lambdas.Functions'):
             log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
             self._lambda.delete_function(FunctionName=l['FunctionName'])
             try:
@@ -125,10 +126,12 @@ class Lambdas(Entity):
             except OSError as e:
                 log.warning("Failed to remove local Lambda zip package: {}".format(e))
 
-        self._state.remove('Lambdas')
+        self._state.remove('Lambdas.Functions')
 
     def _default_lambda_role_arn(self):
-        if self._state.get('LambdaRole'):
+        # TODO(XXX): Refactor, merge with _create_default_lambda_role;
+        #            consider not messing with state here, move it up.
+        if self._state.get('Lambdas.LambdaRole'):
             log.info("Default lambda role '{0}' already creted, RoleId={1} ".format(
                 self._LAMBDA_ROLE_NAME, self._state.get('LambdaRole.Role.RoleId')))
         else:
@@ -141,8 +144,8 @@ class Lambdas(Entity):
                 else:
                     raise e
 
-            self._state.update('LambdaRole', rinse(role))
-        return self._state.get('LambdaRole.Role.Arn')
+            self._state.update('Lambdas.LambdaRole', rinse(role))
+        return self._state.get('Lambdas.LambdaRole.Role.Arn')
 
     def _create_default_lambda_role(self):
         # TODO: redo as template and read from definition .yaml

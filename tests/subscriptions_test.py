@@ -27,28 +27,6 @@ Subscriptions:
     Target: cloud
 '''
 
-ministate = {
-    "Connectors": {
-        "Arn": "arn:aws:greengrass:us-west-2:000000000000:/greengrass/definition/connectors/0000",
-        "LatestVersionDetails": {
-            "Definition": {
-                "Connectors": [{
-                    "ConnectorArn": "arn:aws:greengrass:us-west-2::/connectors/XXXXX",
-                    "Id": "ModbusProtocolAdapterConnector"
-
-                }]
-            },
-        },
-        "Name": "Modbus-greengate_connectors"
-    },
-    "Lambdas": [
-        {
-            "FunctionArn": "arn:aws:lambda:us-west-2:000000000000:function:GreengrassHelloWorld",
-            "FunctionName": "GreengrassHelloWorld",
-        }
-    ],
-}
-
 
 class SubscriptionsTest(unittest.TestCase):
     '''
@@ -70,10 +48,10 @@ class SubscriptionsTest(unittest.TestCase):
             s._resolve_subscription_destination("Connector::ModbusProtocolAdapterConnector"),
             s._state.get('Connectors.LatestVersionDetails.Definition.Connectors')[0]['ConnectorArn']
         )
-
         self.assertEqual(
             s._resolve_subscription_destination("Lambda::GreengrassHelloWorld"),
-            s._state.get('FunctionDefinition.LatestVersionDetails.Definition.Functions')[0]['FunctionArn']
+            s._state.get(
+                'Lambdas.FunctionDefinition.LatestVersionDetails.Definition.Functions')[0]['FunctionArn']
         )
 
         self.assertEqual(
