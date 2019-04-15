@@ -40,7 +40,7 @@ class Resources(Entity):
             ResourceDefinitionVersionId=self._state.get('Resources.LatestVersion')
         ))
 
-        self._state.update('Subscriptions.LatestVersionDetails', res_def_ver)
+        self._state.update('Resources.LatestVersionDetails', res_def_ver)
 
     def _do_remove(self):
         log.debug("Deleting resources definition '{0}' Id='{1}".format(
