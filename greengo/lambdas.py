@@ -114,19 +114,25 @@ class Lambdas(Entity):
             self._gg.delete_function_definition(FunctionDefinitionId=fd_id)
             self._state.remove('Lambdas.FunctionDefinition')
 
-        log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
-        self._remove_default_lambda_role()
-        self._state.remove('Lambdas.LambdaRole')
+        if not self._state.get('Lambdas.LambdaRole'):
+            log.warning("Lambda Role was not created. Moving on...")
+        else:
+            log.info("Deleting default lambda role '{0}'".format(self._LAMBDA_ROLE_NAME))
+            self._remove_default_lambda_role()
+            self._state.remove('Lambdas.LambdaRole')
 
-        for l in self._state.get('Lambdas.Functions'):
-            log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
-            self._lambda.delete_function(FunctionName=l['FunctionName'])
-            try:
-                os.remove(l['ZipPath'])
-            except OSError as e:
-                log.warning("Failed to remove local Lambda zip package: {}".format(e))
+        if not self._state.get('Lambdas.Functions'):
+            log.warning("Lambda Functions were not created. Moving on...")
+        else:
+            for l in self._state.get('Lambdas.Functions'):
+                log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
+                self._lambda.delete_function(FunctionName=l['FunctionName'])
+                try:
+                    os.remove(l['ZipPath'])
+                except OSError as e:
+                    log.warning("Failed to remove local Lambda zip package: {}".format(e))
 
-        self._state.remove('Lambdas.Functions')
+            self._state.remove('Lambdas.Functions')
 
     def _default_lambda_role_arn(self):
         # TODO(XXX): Refactor, merge with _create_default_lambda_role;
