@@ -50,6 +50,9 @@ class BotoSessionFixture():
         self.greengrass.get_function_definition_version = MagicMock(
             return_value=function_definition_version_return)
 
+        self.greengrass.create_logger_definition = MagicMock(
+            return_value=state.get('Loggers'))
+
         self.iot = MagicMock()
         self.iot.create_keys_and_certificate = MagicMock(
             return_value=state.get('Cores')[0]['keys'])

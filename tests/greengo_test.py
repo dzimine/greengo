@@ -44,6 +44,7 @@ class CommandTest(unittest.TestCase):
         self.assertIsNotNone(self.gg.state.get('CoreDefinition'))
         self.assertIsNotNone(self.gg.state.get('Subscriptions'))
         self.assertIsNotNone(self.gg.state.get('Resources'))
+        self.assertIsNotNone(self.gg.state.get('Loggers'))
         self.assertIsNotNone(self.gg.state.get('Group.Version'))
 
         # Check that cert and config files have been created
@@ -81,6 +82,11 @@ class CommandTest(unittest.TestCase):
         self.assertTrue(gg.delete_function_definition.called)
         # Subscriptions
         self.assertTrue(gg.delete_subscription_definition.called)
+        # Resources
+        self.assertTrue(gg.delete_resource_definition.called)
+        # Loggers
+        self.assertTrue(gg.delete_logger_definition.called)
+
         # Core
         self.assertTrue(gg.delete_core_definition.called)
         self.assertTrue(iot.delete_thing)

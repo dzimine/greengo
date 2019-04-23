@@ -14,6 +14,7 @@ from .group import Group
 from .lambdas import Lambdas
 from .subscriptions import Subscriptions
 from .resources import Resources
+from .loggers import Loggers
 
 log = logging.getLogger(__name__)
 
@@ -68,13 +69,17 @@ class Commands(object):
 
         Group(self.group, self.state).create(update_group_version=False)
 
+        # Create other entities, as defined in a group.
+
         Lambdas(self.group, self.state).create(update_group_version=False)
 
         Subscriptions(self.group, self.state).create(update_group_version=False)
 
         Resources(self.group, self.state).create(update_group_version=False)
 
-        # Create other entities like this...
+        Loggers(self.group, self.state).create(update_group_version=False)
+
+        # Other entities go here...
 
         Group.create_group_version(self.state)
 
@@ -90,6 +95,10 @@ class Commands(object):
         Subscriptions(self.group, self.state).remove(update_group_version=False)
 
         Lambdas(self.group, self.state).remove(update_group_version=False)
+
+        Resources(self.group, self.state).remove(update_group_version=False)
+
+        Loggers(self.group, self.state).remove(update_group_version=False)
 
         # Remove other entities here, before removing Group.
 
