@@ -171,7 +171,7 @@ class Group(Entity):
 
         config = {
             "coreThing": {
-                "caPath": "root-CA.crt",
+                "caPath": "root.ca.pem",
                 "certPath": core_thing['thingName'] + ".pem",
                 "keyPath": core_thing['thingName'] + ".key",
                 "thingArn": core_thing['thingArn'],

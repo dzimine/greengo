@@ -80,11 +80,11 @@ class Entity(object):
         raise NotImplementedError
 
     def _post_remove(self, update_group_version):
-        self._state.remove(self.type)
         if update_group_version:
             log.info("Updating group version with {} removed...".format(self.type))
             self.create_group_version(self._state)
 
+        self._state.remove(self.type)
         log.info("{} removed OK!".format(self.type.lower()))
 
     @classmethod
@@ -98,17 +98,17 @@ class Entity(object):
         kwargs = dict(
             GroupId=state.get('Group')['Id'],  # REQUIRED
             CoreDefinitionVersionArn=state.get(
-                'CoreDefinition', {}).get('LatestVersionArn', ""),
+                'CoreDefinition.LatestVersionArn', ""),
             FunctionDefinitionVersionArn=state.get(
-                'FunctionDefinition', {}).get('LatestVersionArn', ""),
+                'Lambdas.FunctionDefinition.LatestVersionArn', ""),
             SubscriptionDefinitionVersionArn=state.get(
-                'Subscriptions', {}).get('LatestVersionArn', ""),
+                'Subscriptions.LatestVersionArn', ""),
             LoggerDefinitionVersionArn=state.get(
-                'Loggers', {}).get('LatestVersionArn', ""),
+                'Loggers.LatestVersionArn', ""),
             ResourceDefinitionVersionArn=state.get(
-                'Resources', {}).get('LatestVersionArn', ""),
+                'Resources.LatestVersionArn', ""),
             ConnectorDefinitionVersionArn=state.get(
-                'Connectors', {}).get('LatestVersionArn', ""),
+                'Connectors.LatestVersionArn', ""),
             DeviceDefinitionVersionArn=""  # NOT IMPLEMENTED
         )
         args = dict((k, v) for k, v in kwargs.items() if v)

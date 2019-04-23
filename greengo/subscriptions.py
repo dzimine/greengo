@@ -68,7 +68,7 @@ class Subscriptions(Entity):
                 "'Lambda::', 'Device::', 'Connector::', 'GGShadowService', or 'cloud'.".format(d))
 
     def _lookup_lambda_qualified_arn(self, name):
-        for l in self._state.get('FunctionDefinition.LatestVersionDetails.Definition.Functions', []):
+        for l in self._state.get('Lambdas.FunctionDefinition.LatestVersionDetails.Definition.Functions', []):
             if l['Id'] == name:
                 return l['FunctionArn']
         log.error("Lambda '{0}' not found".format(name))

@@ -53,21 +53,38 @@ class LambdasTest(unittest.TestCase):
     def test_lambda_create(self):
         group = self.group
         state = clone_test_state()
+        functions = state.get('Lambdas.Functions')
+        function_def = state.get('Lambdas.FunctionDefinition')
+        lambda_role = state.get('Lambdas.LambdaRole')
+
         state.remove('Lambdas')
+
         Lambdas(group, state)._do_create()
+
+        self.assertEqual(
+            state.get('Lambdas.Functions')[0]['FunctionArn'],
+            functions[0]['FunctionArn'])
+        self.assertDictEqual(
+            state.get('Lambdas.FunctionDefinition'),
+            function_def
+        )
+        self.assertDictEqual(
+            state.get('Lambdas.LambdaRole'),
+            lambda_role
+        )
 
     def test_default_lambda_role_arn__already_created(self):
         group = self.group
         state = clone_test_state()
         arn = Lambdas(group, state)._default_lambda_role_arn()
-        self.assertEqual(arn, state.get('LambdaRole.Role.Arn'))
+        self.assertEqual(arn, state.get('Lambdas.LambdaRole.Role.Arn'))
 
     def test_default_lambda_role_arn__create(self):
         group = self.group
-        arn = clone_test_state().get('LambdaRole.Role.Arn')
+        arn = clone_test_state().get('Lambdas.LambdaRole.Role.Arn')
         state = State(file=None)
         arn = Lambdas(group, state)._default_lambda_role_arn()
-        self.assertEqual(arn, state.get('LambdaRole.Role.Arn'))
+        self.assertEqual(arn, state.get('Lambdas.LambdaRole.Role.Arn'))
 
     def test_default_lambda_role_arn__previously_defined(self):
         group = self.group
@@ -83,9 +100,10 @@ class LambdasTest(unittest.TestCase):
     def test_lambda_remove(self):
         group = self.group
         state = clone_test_state()
-        self.assertTrue(state.get('Lambdas'))
-        self.assertTrue(state.get('FunctionDefinition'))
-        self.assertTrue(state.get('LambdaRole'))
+
+        self.assertTrue(state.get('Lambdas.Functions'))
+        self.assertTrue(state.get('Lambdas.FunctionDefinition'))
+        self.assertTrue(state.get('Lambdas.LambdaRole'))
 
         la = Lambdas(group, state)
 
@@ -95,15 +113,15 @@ class LambdasTest(unittest.TestCase):
 
         self.assertTrue(la._lambda.delete_function.called)
         self.assertTrue(la._gg.delete_function_definition.called)
-        self.assertFalse(state.get('Lambdas'))
-        self.assertFalse(state.get('FunctionDefinition'))
-        self.assertFalse(state.get('LambdaRole'))
+        self.assertFalse(state.get('Lambdas.Functions'))
+        self.assertFalse(state.get('Lambdas.FunctionDefinition'))
+        self.assertFalse(state.get('Lambdas.LambdaRole'))
 
     def test_lambda_remove__no_function_definitions(self):
         group = self.group
         state = clone_test_state()
-        self.assertTrue(state.get('Lambdas'))
-        state.remove('FunctionDefinition')
+        self.assertTrue(state.get('Lambdas.FunctionDefinition'))
+        state.remove('Lambdas.FunctionDefinition')
 
         la = Lambdas(group, state)
         with patch('os.remove'):
@@ -111,3 +129,46 @@ class LambdasTest(unittest.TestCase):
 
         self.assertTrue(la._lambda.delete_function.called)
         self.assertFalse(la._gg.delete_function_definition.called)
+
+    def test_lambda_update__not_created(self):
+        state = clone_test_state()
+        state.remove("Lambdas.Functions")
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='INFO') as l:
+            la.update_lambda("WhateverNane_ItsNotCreated")
+            self.assertTrue("No lambda functions created" in '\n'.join(l.output))
+
+    def test_lambda_update__not_found(self):
+        state = clone_test_state()
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='ERROR') as l:
+            la.update_lambda("NoSuchNane")
+            self.assertTrue("No lambda function 'NoSuchNane' found" in '\n'.join(l.output))
+
+    def test_lambda_update__not_defined(self):
+        state = clone_test_state()
+        name = self.group['Lambdas'][0]['name']
+        self.group['Lambdas'][0]['name'] = "ChangeNameInDefinition"
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='ERROR') as l:
+            la.update_lambda(name)
+            self.assertTrue("No definition for lambda" in '\n'.join(l.output))
+
+    def test_lambda_update(self):
+        state = clone_test_state()
+        print(state.get('Lambdas.Functions'))
+        name = self.group['Lambdas'][0]['name']
+        la = Lambdas(self.group, state)
+        return_value = state.get('Lambdas.Functions')[0].copy()
+        return_value['RevisionId'] = "NEW"
+        la._lambda.update_function_code = MagicMock(return_value=return_value)
+
+        la.update_lambda(name)
+
+        print(state.get('Lambdas.Functions'))
+        self.assertEqual(state.get('Lambdas.Functions')[0]['RevisionId'], "NEW")
+        # TODO: check return structure of update_function_code
+
