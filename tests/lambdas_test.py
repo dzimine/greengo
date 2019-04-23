@@ -129,3 +129,46 @@ class LambdasTest(unittest.TestCase):
 
         self.assertTrue(la._lambda.delete_function.called)
         self.assertFalse(la._gg.delete_function_definition.called)
+
+    def test_lambda_update__not_created(self):
+        state = clone_test_state()
+        state.remove("Lambdas.Functions")
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='INFO') as l:
+            la.update_lambda("WhateverNane_ItsNotCreated")
+            self.assertTrue("No lambda functions created" in '\n'.join(l.output))
+
+    def test_lambda_update__not_found(self):
+        state = clone_test_state()
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='ERROR') as l:
+            la.update_lambda("NoSuchNane")
+            self.assertTrue("No lambda function 'NoSuchNane' found" in '\n'.join(l.output))
+
+    def test_lambda_update__not_defined(self):
+        state = clone_test_state()
+        name = self.group['Lambdas'][0]['name']
+        self.group['Lambdas'][0]['name'] = "ChangeNameInDefinition"
+        la = Lambdas(self.group, state)
+
+        with self.assertLogs('greengo.lambdas', level='ERROR') as l:
+            la.update_lambda(name)
+            self.assertTrue("No definition for lambda" in '\n'.join(l.output))
+
+    def test_lambda_update(self):
+        state = clone_test_state()
+        print(state.get('Lambdas.Functions'))
+        name = self.group['Lambdas'][0]['name']
+        la = Lambdas(self.group, state)
+        return_value = state.get('Lambdas.Functions')[0].copy()
+        return_value['RevisionId'] = "NEW"
+        la._lambda.update_function_code = MagicMock(return_value=return_value)
+
+        la.update_lambda(name)
+
+        print(state.get('Lambdas.Functions'))
+        self.assertEqual(state.get('Lambdas.Functions')[0]['RevisionId'], "NEW")
+        # TODO: check return structure of update_function_code
+

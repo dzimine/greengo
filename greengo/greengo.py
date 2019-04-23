@@ -126,6 +126,9 @@ class Commands(object):
     def remove_subscriptions(self):
         Subscriptions(self.group, self.state).remove()
 
+    def update_lambda(self, lambda_name):
+        Lambdas(self.group, self.state).update_lambda(lambda_name)
+
     def deploy(self):
         if not self.state:
             log.info("There is nothing to deploy. Do create first.")
