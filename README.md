@@ -1,12 +1,11 @@
-# Boilerplate for AWS IoT Greengrass
+# Infra as Code for AWS IoT Greengrass
 [![Build Status](https://travis-ci.org/dzimine/greengo.svg?branch=master)](https://travis-ci.org/dzimine/greengo)
 ![Python 2.7](https://img.shields.io/badge/python-2.7-blue.svg)
 ![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)
 [![PyPI version](https://badge.fury.io/py/greengo.svg)](https://badge.fury.io/py/greengo)
 
-<img src="https://github.com/dzimine/greengo/blob/master/misc/greengo.png?raw=true" width="50px"> Greengo: a starter project to bring up (and clean-up!) AWS Greengrass setup for play and profit. If you followed the [GreenGrass Getting Started Guide](https://docs.aws.amazon.com/greengrass/latest/developerguide/gg-gs.html), here you find it automated, as code.
+<img src="https://github.com/dzimine/greengo/blob/master/misc/greengo.png?raw=true" width="50px"> Greengo: a tool, and a starter boilerplate project to bring up (and clean-up!) AWS Greengrass setup for play and profit. If you followed the [GreenGrass Getting Started Guide](https://docs.aws.amazon.com/greengrass/latest/developerguide/gg-gs.html), here you find it automated, as code.
 
-> Work In Progress !
 
 Describe your Greengrass group in `group.yaml`, write Lambda functions and device clients, provision Greengrass Core in Vagrant VM, deploy, and clean up.
 
@@ -65,20 +64,19 @@ Yeah, manual sucks... I will automate it later. Or, submit your PR!
 
 5. **Profit !**
 
-6. Work on it: create, change or remove Lambda functions, subscriptions, resources, and then update Greengrass. 
+    Work on it: create, change or remove Lambda functions, subscriptions, resources, and then update Greengrass. 
 
     ```
     $ greengo update
     ```
 
-Apply your changes by deploying it again:
-
+    Apply your changes by deploying it again:
+    
     ```
     $ greengo deploy
     ```
 
-
-7. Clean-up when done playing.
+6. Clean-up when done playing.
 
     Remove the group definitions on AWS:
 
