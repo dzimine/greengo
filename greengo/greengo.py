@@ -20,13 +20,13 @@ log.setLevel(logging.DEBUG)
 DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
 STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
+ROOT_CA_URL = "https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem"
 
 DEPLOY_TIMEOUT = 90  # Timeout, seconds
 
 
 class GroupCommands(object):
     def __init__(self):
-        super(GroupCommands, self).__init__()
 
         s = session.Session()
         self._region = s.region_name
@@ -45,7 +45,7 @@ class GroupCommands(object):
 
         try:
             with open(DEFINITION_FILE, 'r') as f:
-                self.group = self.group = yaml.safe_load(f)
+                self.group = yaml.safe_load(f)
         except IOError:
             log.error("Group definition file `greengo.yaml` not found. "
                       "Create file, and define the group definition first. "
@@ -106,9 +106,10 @@ class GroupCommands(object):
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
     def create_root_key(self):
-        if not os.path.isfile(self.group['certs']['keypath']+"/root-CA.crt"):
-            urllib.urlretrieve("https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem",self.group['certs']['keypath']+"/root-CA.crt")
-
+        if not os.path.isfile(self.group['certs']['keypath'] + "/root-CA.crt"):
+            urllib.urlretrieve(
+                ROOT_CA_URL,
+                self.group['certs']['keypath'] + "/root-CA.crt")
 
     def deploy(self):
         if not self.state:
