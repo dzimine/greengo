@@ -26,7 +26,15 @@ Lambdas:
           #   Permission: 'rw'
         Variables:
            name: value
-
+  - name: HWBeta  # refer already created Lambda by a name
+    alias: dev
+    environment:
+      foo: bar
+    greengrassConfig:
+      MemorySize: 128000 # Kb, ask AWS why
+      Timeout: 10 # Sec
+      Pinned: True # Set True for long-lived functions
+      # the rest of AWS IoT function definition goes here
 Subscriptions:
   - Source: Lambda::GreengrassHelloWorld
     Subject: hello/world
@@ -56,5 +64,3 @@ Loggers:
 Devices: # not implemented
   - name: ml_take2_thing_1
     key_path: ./certs
-
-

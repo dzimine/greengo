@@ -265,69 +265,99 @@ class GroupCommands(object):
         log.info("Lambdas function {0} updated OK!".format(lambda_name))
 
     def create_lambdas(self, update_group_version=True):
+        # if yaml file does not contain lambdas
         if not self.group.get('Lambdas'):
             log.info("Lambdas not defined. Moving on...")
             return
-
-        if self.state and self.state.get('Lambdas'):
-            log.warning("Previously created Lambdas exists. Remove before creating!")
-            return
+        # we want to create existing lambdas!
+        # if self.state and self.state.get('Lambdas'):
+        #     log.warning("Previously created Lambdas exists. Remove before creating!")
+        #     return
 
         functions = []
         self.state['Lambdas'] = []
         _update_state(self.state)
 
         for l in self.group['Lambdas']:
+
             log.info("Creating Lambda function '{0}'".format(l['name']))
 
             role_arn = l['role'] if 'role' in l else self._default_lambda_role_arn()
             log.info("Assuming role '{0}'".format(role_arn))
+            already_defined = not ('handler' in l)
+            if not already_defined:
+                zf = shutil.make_archive(
+                    os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
+                log.debug("Lambda deployment Zipped to '{0}'".format(zf))
 
-            zf = shutil.make_archive(
-                os.path.join(MAGIC_DIR, l['name']), 'zip', l['package'])
-            log.debug("Lambda deployment Zipped to '{0}'".format(zf))
+                for retry in range(3):
+                    try:
+                        with open(zf, 'rb') as f:
+                            lr = self._lambda.create_function(
+                                FunctionName=l['name'],
+                                Runtime='python2.7',
+                                Role=role_arn,
+                                Handler=l['handler'],
+                                Code=dict(ZipFile=f.read()),
+                                Environment=dict(Variables=l.get('environment', {})),
+                                Publish=True
+                            )
+                            # Break from retry cycle if lambda is created
+                            break
+                    except ClientError as e:  # Catch the right exception
+                        if "The role defined for the function cannot be assumed by Lambda" in str(e):
+                            # Function creation immediately after role creation fails with
+                            # "The role defined for the function cannot be assumed by Lambda."
+                            # See StackOverflow https://goo.gl/eTfqsS
+                            log.warning("We hit AWS bug: the role is not yet propagated."
+                                        "Taking 10 sec nap")
+                            sleep(10)
+                            continue
+                        else:
+                            raise(e)
 
-            for retry in range(3):
-                try:
-                    with open(zf, 'rb') as f:
-                        lr = self._lambda.create_function(
+                lr['ZipPath'] = zf
+            else:
+                for retry in range(3):
+                    try:
+                        lr = self._lambda.get_function_configuration(
                             FunctionName=l['name'],
-                            Runtime='python2.7',
-                            Role=role_arn,
-                            Handler=l['handler'],
-                            Code=dict(ZipFile=f.read()),
-                            Environment=dict(Variables=l.get('environment', {})),
-                            Publish=True
+                            Qualifier=l['alias']
                         )
                         # Break from retry cycle if lambda is created
                         break
-                except ClientError as e:  # Catch the right exception
-                    if "The role defined for the function cannot be assumed by Lambda" in str(e):
-                        # Function creation immediately after role creation fails with
-                        # "The role defined for the function cannot be assumed by Lambda."
-                        # See StackOverflow https://goo.gl/eTfqsS
-                        log.warning("We hit AWS bug: the role is not yet propagated."
-                                    "Taking 10 sec nap")
-                        sleep(10)
-                        continue
-                    else:
-                        raise(e)
-
-            lr['ZipPath'] = zf
+                    except ClientError as e:  # Catch the right exception
+                        if "The role defined for the function cannot be assumed by Lambda" in str(e):
+                            # Function creation immediately after role creation fails with
+                            # "The role defined for the function cannot be assumed by Lambda."
+                            # See StackOverflow https://goo.gl/eTfqsS
+                            log.warning("We hit AWS bug: the role is not yet propagated."
+                                        "Taking 10 sec nap")
+                            sleep(10)
+                            continue
+                        else:
+                            raise(e)
             self.state['Lambdas'].append(rinse(lr))
             _update_state(self.state)
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
 
             # Auto-created alias uses the version of just published function
-            alias = self._lambda.create_alias(
+            if not already_defined:
+                alias = self._lambda.create_alias(
+                    FunctionName=lr['FunctionName'],
+                    Name=l.get('alias', 'default'),
+                    FunctionVersion=lr['Version'],
+                    Description='Created by greengo'
+                )
+            else:
+                alias = self._lambda.get_alias(
                 FunctionName=lr['FunctionName'],
-                Name=l.get('alias', 'default'),
-                FunctionVersion=lr['Version'],
-                Description='Created by greengo'
-            )
+                Name=l.get('alias', 'default')
+                )
             log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
                 alias['FunctionVersion'], alias['AliasArn']))
-
+            print(l)
+            print("$$$$$$$$$$$$$$$$$$$$")
             functions.append({
                 'Id': l['name'],
                 'FunctionArn': alias['AliasArn'],
@@ -378,9 +408,14 @@ class GroupCommands(object):
         _update_state(self.state)
 
         for l in self.state['Lambdas']:
-            log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
-            self._lambda.delete_function(FunctionName=l['FunctionName'])
-            os.remove(l['ZipPath'])
+            already_defined = not ('handler' in l)
+            print(l)
+            # print(l['name'])
+            print("already defined?:  "+str(already_defined))
+            if not already_defined:
+                log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
+                self._lambda.delete_function(FunctionName=l['FunctionName'])
+                os.remove(l['ZipPath'])
 
         self.state.pop('Lambdas')
         _update_state(self.state)
