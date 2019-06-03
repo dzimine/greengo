@@ -337,6 +337,7 @@ class GroupCommands(object):
                             continue
                         else:
                             raise(e)
+                lr['already_defined'] = True;
             self.state['Lambdas'].append(rinse(lr))
             _update_state(self.state)
             log.info("Lambda function '{0}' created".format(lr['FunctionName']))
@@ -356,8 +357,7 @@ class GroupCommands(object):
                 )
             log.info("Lambda alias created. FunctionVersion:'{0}', Arn:'{1}'".format(
                 alias['FunctionVersion'], alias['AliasArn']))
-            print(l)
-            print("$$$$$$$$$$$$$$$$$$$$")
+
             functions.append({
                 'Id': l['name'],
                 'FunctionArn': alias['AliasArn'],
@@ -408,7 +408,7 @@ class GroupCommands(object):
         _update_state(self.state)
 
         for l in self.state['Lambdas']:
-            already_defined = not ('handler' in l)
+            already_defined = ('already_defined' in l)
             print(l)
             # print(l['name'])
             print("already defined?:  "+str(already_defined))
