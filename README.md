@@ -93,7 +93,7 @@ For any of the above commands you may specify a different yaml file using
 ```
 $ greengo --config_file <name>.yaml <command>
 ```
-where <name> is the name of your yaml and <command is whatever you wish to run>
+where <name> is the name of your yaml and <command> is whatever you wish to run
 
 > NOTE: If you want to create a new group but keep the Greengrass Core in the same Vagrant VM,
 > you must update it with newly generated certificates and `config.json` file
