@@ -49,7 +49,7 @@ class GroupCommands(object):
             with open(DEFINITION_FILE, 'r') as f:
                 self.group = yaml.safe_load(f)
         except IOError:
-            log.error("Group definition file `greengo.yaml` not found. "
+            log.error("Group definition file "+DEFINITION_FILE+" not found. "
                       "Create file, and define the group definition first. "
                       "See https://github.com/greengo for details.")
             exit(-1)
