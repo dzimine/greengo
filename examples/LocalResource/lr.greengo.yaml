@@ -1,0 +1,66 @@
+# Greeengrass Group definition file
+Group:
+  name: GroupEpsilon
+Cores:
+  - name: GroupEpsilon_core
+    key_path: ./certs
+    config_path: ./config
+    SyncShadow: False
+
+Lambdas:
+  - name: localresource
+    handler: localresource.function_handler
+    package: Lambdas/
+    alias: dev
+    # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use an existing role instead of auto-created one
+    environment:
+      foo: bar
+    greengrassConfig:
+      MemorySize: 16384 # Kb, ask AWS why
+      Timeout: 30 # Sec
+      Pinned: True # Set True for long-lived functions
+      Environment:
+        AccessSysfs: True
+        ResourceAccessPolicies:
+          - ResourceId: data-volume
+            Permission: rw
+          # - ResourceId: data-device
+          #   Permission: ro
+        Variables:
+           name: value
+
+Subscriptions:
+  - Source: Lambda::localresource
+    Subject: LRA/test
+    Target: cloud
+  - Source: cloud
+    Subject: invoke/LRAFunction
+    Target: Lambda::localresource
+
+Resources:
+    # For parameter definitions, see http://boto3.readthedocs.io/en/latest/reference/services/greengrass.html#Greengrass.Client.create_resource_definition_version
+  - Name: TestDirectory
+    Id: data-volume
+    LocalVolumeResourceData:
+      SourcePath: /src/LRAtest
+      DestinationPath: /dest/LRAtest
+      GroupOwnerSetting:
+        AutoAddGroupOwner: True
+  # - Name: TestCamera
+  #   Id: data-device
+  #   LocalVolumeResourceData:
+  #     SourcePath: /dev/video0
+  #     GroupOwnerSetting:
+  #       AutoAddGroupOwner: True
+
+Loggers:
+    # For parameter definitions, see https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/greengrass.html#Greengrass.Client.create_logger_definition
+  - Component: Lambda  # 'GreengrassSystem'|'Lambda'
+    Id: logger_1       # Arbitrary string
+    Level: DEBUG       # 'DEBUG'|'INFO'|'WARN'|'ERROR'|'FATAL'
+    Space: 1024        # The amount of file space, in KB, to use if the local file system is used for logging purposes
+    Type: FileSystem   # 'FileSystem'|'AWSCloudWatch'
+#
+# Devices: # not implemented
+#   - name: ml_take2_thing_1
+#     key_path: ./certs
