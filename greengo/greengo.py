@@ -20,14 +20,14 @@ log.setLevel(logging.DEBUG)
 DEFINITION_FILE = 'greengo.yaml'
 MAGIC_DIR = '.gg'
 STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
-ROOT_CA_URL = "https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem"
+ROOT_CA_URL = "https://www.amazontrust.com/repository/AmazonRootCA1.pem"
 
 DEPLOY_TIMEOUT = 90  # Timeout, seconds
 
 
 class GroupCommands(object):
-    def __init__(self):
-
+    def __init__(self, config_file=DEFINITION_FILE, bulk=False):
+        global STATE_FILE, DEFINITION_FILE, MAGIC_DIR
         s = session.Session()
         self._region = s.region_name
         if not self._region:
@@ -41,7 +41,9 @@ class GroupCommands(object):
         self._iot = s.client("iot")
         self._lambda = s.client("lambda")
         self._iam = s.client("iam")
-        self._iot_endpoint = self._iot.describe_endpoint()['endpointAddress']
+        self._iot_endpoint = self._iot.describe_endpoint(endpointType='iot:Data-ATS')['endpointAddress']
+
+        DEFINITION_FILE = config_file
 
         try:
             with open(DEFINITION_FILE, 'r') as f:
@@ -54,6 +56,11 @@ class GroupCommands(object):
 
         self.name = self.group['Group']['name']
         self._LAMBDA_ROLE_NAME = "{0}_Lambda_Role".format(self.name)
+
+        if bulk:
+            log.info("Bulk Creation Enabled")
+            MAGIC_DIR = self.name + "-GG-Config"
+            STATE_FILE = os.path.join(MAGIC_DIR, 'gg_state.json')
 
         _mkdir(MAGIC_DIR)
         self.state = _load_state()
@@ -106,10 +113,10 @@ class GroupCommands(object):
         log.info("[END] creating group {0}".format(self.group['Group']['name']))
 
     def create_root_key(self):
-        if not os.path.isfile(self.group['certs']['keypath'] + "/root-CA.crt"):
+        if not os.path.isfile(self.group['certs']['keypath'] + "/root.ca.pem"):
             urllib.urlretrieve(
                 ROOT_CA_URL,
-                self.group['certs']['keypath'] + "/root-CA.crt")
+                self.group['certs']['keypath'] + "/root.ca.pem")
 
     def deploy(self):
         if not self.state:
@@ -409,9 +416,9 @@ class GroupCommands(object):
 
         for l in self.state['Lambdas']:
             already_defined = ('already_defined' in l)
-            print(l)
+            # print(l)
             # print(l['name'])
-            print("already defined?:  "+str(already_defined))
+            # print("already defined?:  "+str(already_defined))
             if not already_defined:
                 log.info("Deleting Lambda function '{0}'".format(l['FunctionName']))
                 self._lambda.delete_function(FunctionName=l['FunctionName'])
@@ -838,12 +845,12 @@ class GroupCommands(object):
 
         config = {
             "coreThing": {
-                "caPath": "root-CA.crt",
-                "certPath": core_thing['thingName'] + ".pem",
-                "keyPath": core_thing['thingName'] + ".key",
+                "caPath": "root.ca.pem",
+                "certPath": core_thing['thingName'] + ".cert.pem",
+                "keyPath": core_thing['thingName'] + ".private.key",
                 "thingArn": core_thing['thingArn'],
                 "iotHost": self._iot_endpoint,
-                "ggHost": "greengrass.iot." + self._region + ".amazonaws.com",
+                "ggHost": "greengrass-ats.iot." + self._region + ".amazonaws.com",
                 "keepAlive": 600
             },
             "runtime": {
@@ -851,7 +858,19 @@ class GroupCommands(object):
                     "useSystemd": "yes"
                 }
             },
-            "managedRespawn": False
+            "managedRespawn": False,
+            "crypto" : {
+            "principals" : {
+              "SecretsManager" : {
+                "privateKeyPath" : "file:///greengrass/certs/" + core_thing['thingName'] + ".private.key"
+              },
+              "IoTCertificate" : {
+                "privateKeyPath" : "file:///greengrass/certs/" + core_thing['thingName'] + ".private.key",
+                "certificatePath" : "file:///greengrass/certs/" + core_thing['thingName'] + ".cert.pem"
+              }
+            },
+            "caPath" : "file:///greengrass/certs/root.ca.pem"
+          }
         }
 
         _mkdir(path)
@@ -966,9 +985,9 @@ def _save_keys(path, name, keys_cert):
     try:
         path = path + '/' if not path.endswith('/') else path
         _mkdir(path)
-        certname = path + name + ".pem"
+        certname = path + name + ".cert.pem"
         public_key_file = path + name + ".pub"
-        private_key_file = path + name + ".key"
+        private_key_file = path + name + ".private.key"
         with open(certname, "w") as pem_file:
             pem = keys_cert['certificatePem']
             pem_file.write(pem)
