@@ -11,7 +11,7 @@ from boto3 import session
 from botocore.exceptions import ClientError
 
 logging.basicConfig(
-    format='%(asctime)s|%(name).10s|%(levelname).5s: %(message)s',
+    format='[gg] %(levelname).4s-%(lineno)d: %(message)s',
     level=logging.WARNING)
 log = logging.getLogger('greengo')
 log.setLevel(logging.DEBUG)
@@ -84,10 +84,16 @@ class GroupCommands(object):
         # Or on exception?
 
         # 2. Create core a) thing b) attach to group
-        core_def, cores = self._create_cores()
-        self.state['Cores'] = cores
-        self.state['CoreDefinition'] = core_def
-        _update_state(self.state)
+        # core_def, cores = self._create_cores()
+        # self.state['Cores'] = cores
+        # self.state['CoreDefinition'] = core_def
+        # _update_state(self.state)
+        self._create_cores()
+        self._create_devices()
+        # device_def, devices = self._create_devices()
+        # self.state['Devices'] = devices
+        # self.state['DeviceDefinition'] = device_def
+        # _update_state(self.state)
 
         # 3. Create Resources - policies for local and ML resource access.
         self.create_resources()
@@ -193,6 +199,7 @@ class GroupCommands(object):
         self.remove_subscriptions()
 
         self._remove_cores()
+        self._remove_devices()
 
         self.remove_lambdas()
 
@@ -514,7 +521,14 @@ class GroupCommands(object):
         return None
 
     def _lookup_device_arn(self, name):
-        raise NotImplementedError("WIP: Devices not implemented yet.")
+        details = self.state['DeviceDefinition']['LatestVersionDetails']
+        for l in details['Definition']['Devices']:
+            print("FFFFFFFFF")
+            print(pretty(l))
+            if l['Id'] == name:
+                return l['ThingArn']
+        log.error("Device '{0}' not found".format(name))
+        return None
 
     def _lookup_connector_arn(self, name):
         details = self.state['Connectors']['LatestVersionDetails']
@@ -674,7 +688,7 @@ class GroupCommands(object):
         self.remove_subscriptions()
         self.remove_lambdas()
         self.remove_resources()
-
+        # self.remove_devices()
         self.create_resources()
         self.create_lambdas()
         self.create_subscriptions()
@@ -682,11 +696,80 @@ class GroupCommands(object):
         self.create_group_version()
 
         log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
+    def _create_devices(self):
+        # TODO: Refactor-handle state internally, make callable individually
+        #       Maybe reflet dependency tree in self.group/greensgo.yaml and travel it
+        self.state['Devices'] = []
+        devices = []
+        initial_version = {'Devices': []}
+
+        for device_description in self.group['Devices']:
+            try:
+                name = device_description['name']
+                log.info("Creating a thing for core {0}".format(name))
+                keys_cert = rinse(self._iot.create_keys_and_certificate(setAsActive=True))
+                device_thing = rinse(self._iot.create_thing(thingName=name))
+
+                # Attach the previously created Certificate to the created Thing
+                self._iot.attach_thing_principal(
+                    thingName=name, principal=keys_cert['certificateArn'])
+                policy = self._create_and_attach_thing_policy(
+                    thing_name=name,
+                    policy_doc=self._create_device_policy(),
+                    thing_cert_arn=keys_cert['certificateArn']
+                )
+
+                devices.append({
+                    'name': name,
+                    'thing': device_thing,
+                    'keys': keys_cert,
+                    'policy': policy
+                })
+
+
+                initial_version['Devices'].append({
+                    'Id': name,
+                    'CertificateArn': keys_cert['certificateArn'],
+                    'SyncShadow': device_description['SyncShadow'],
+                    'ThingArn': device_thing['thingArn']
+                })
+
+                _save_keys(device_description['key_path'], name, keys_cert)
+
+            except Exception as e:
+                log.error("Error creating device {0}: {1}".format(name, str(e)))
+                # Continue with other devices if any
+        self.state['Devices'] = devices
+        _update_state(self.state)
+        log.debug("Creating Device definition with InitialVersion={0}".format(
+            initial_version))
+
+        device_def = rinse(self._gg.create_device_definition(
+            Name=self.name + '_func_def_1',
+            InitialVersion=initial_version
+        ))
+        self.state['DeviceDefinition'] = device_def
+        _update_state(self.state)
+        log.info("Created Device definition Arn:{0} Id:{1}".format(
+            device_def['Arn'], device_def['Id']))
+        device_ver = self._gg.get_device_definition_version(
+            DeviceDefinitionId=self.state['DeviceDefinition']['Id'],
+            DeviceDefinitionVersionId=self.state['DeviceDefinition']['LatestVersion'])
+
+        self.state['DeviceDefinition']['LatestVersionDetails'] = rinse(device_ver)
+        _update_state(self.state)
+
+
+        self.state['Devices'] = devices
+
+        _update_state(self.state)
+        log.info("Devices and definition created OK!")
 
     def _create_cores(self):
         # TODO: Refactor-handle state internally, make callable individually
         #       Maybe reflet dependency tree in self.group/greensgo.yaml and travel it
         self.state['Cores'] = []
+        _update_state(self.state)
         cores = []
         initial_version = {'Cores': []}
 
@@ -713,8 +796,8 @@ class GroupCommands(object):
                     'policy': policy
                 })
 
-                self.state['Cores'] = cores
-                _update_state(self.state)
+                # self.state['Cores'] = cores
+                # _update_state(self.state)
 
                 initial_version['Cores'].append({
                     'Id': name,
@@ -742,11 +825,56 @@ class GroupCommands(object):
             log.info("Created Core definition Arn:{0} Id:{1}".format(
                 core_def['Arn'], core_def['Id']))
 
-        return core_def, cores
+        self.state['Cores'] = cores
+        # print("YYYYYYYYYYYYY")
+        # print(cores)
+        # print("ZZZZZ")
+        # print(self.state['Cores'])
+        self.state['CoreDefinition'] = core_def
+        # print("YYYYYYYYYYYYY")
+        # print(core_def)
+        # print("ZZZZZ")
+        # print(self.state['CoreDefinition'])
+        _update_state(self.state)
+    def _remove_devices(self):
+        # TODO: protect with try/catch ClientError
+        for device in self.state['Devices']:
+            thing_name = device['thing']['thingName']
+            cert_id = device['keys']['certificateId']
+            log.info("Removing device thing '{0}'' from device '{1}'".format(
+                device['name'], thing_name))
+
+            log.debug("--- detaching policy: '{0}'".format(device['policy']['policyName']))
+            self._iot.detach_principal_policy(
+                policyName=device['policy']['policyName'], principal=device['keys']['certificateArn'])
+
+            log.debug("--- deleting policy: '{0}'".format(device['policy']['policyName']))
+            self._iot.delete_policy(policyName=device['policy']['policyName'])
+
+            log.debug("--- deactivating certificate: '{0}'".format(device['keys']['certificateId']))
+            self._iot.update_certificate(
+                certificateId=cert_id, newStatus='INACTIVE')
+
+            log.debug(
+                "--- detaching certificate '{0}' from thing '{1}'".format(cert_id, thing_name))
+            self._iot.detach_thing_principal(
+                thingName=thing_name, principal=device['keys']['certificateArn'])
+            sleep(1)
+
+            log.debug("--- deleting certificate: '{0}'".format(device['keys']['certificateId']))
+            self._iot.delete_certificate(certificateId=device['keys']['certificateId'])
+
+            log.debug("--- deleting thing: '{0}'".format(device['thing']['thingName']))
+            self._iot.delete_thing(thingName=device['thing']['thingName'])
+
+        device_def = self.state['DeviceDefinition']
+        log.info("Removing device definition '{0}'".format(device_def['Name']))
+        self._gg.delete_device_definition(DeviceDefinitionId=device_def['Id'])
 
     def _remove_cores(self):
         # TODO: protect with try/catch ClientError
         for core in self.state['Cores']:
+            # print("YOOOOOOOOOOOOOOO")
             thing_name = core['thing']['thingName']
             cert_id = core['keys']['certificateId']
             log.info("Removing core thing '{0}'' from core '{1}'".format(
@@ -802,7 +930,27 @@ class GroupCommands(object):
             policy_name, thing_name, thing_cert_arn))
 
         return policy
-
+    def _create_device_policy(self):
+        # TODO: redo as template and read from definition file
+        device_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "iot:Publish",
+                        "iot:Subscribe",
+                        "iot:Connect",
+                        "iot:Receive",
+                        "iot:GetThingShadow",
+                        "iot:DeleteThingShadow",
+                        "iot:UpdateThingShadow"
+                    ],
+                    "Resource": ["arn:aws:iot:" + self._region + ":*:*"]
+                }
+            ]
+        }
+        return json.dumps(device_policy)
     def _create_core_policy(self):
         # TODO: redo as template and read from definition file
         core_policy = {
@@ -932,7 +1080,8 @@ class GroupCommands(object):
 
 
 def rinse(boto_response):
-    boto_response.pop('ResponseMetadata')
+    if 'ResponseMetadata' in boto_response:
+        boto_response.pop('ResponseMetadata')
     return boto_response
 
 
