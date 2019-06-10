@@ -72,7 +72,7 @@ Loggers:
 Devices:
   - name: GG_TrafficLight2
     key_path: ./certs
-    SyncShadow: False
+    SyncShadow: True
   - name: GG_Switch2
     key_path: ./certs
     SyncShadow: False
