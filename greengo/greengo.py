@@ -90,16 +90,10 @@ class GroupCommands(object):
         # Or on exception?
 
         # 2. Create core a) thing b) attach to group
-        # core_def, cores = self._create_cores()
-        # self.state['Cores'] = cores
-        # self.state['CoreDefinition'] = core_def
-        # _update_state(self.state)
         self._create_cores()
+
+        # 5. Create devices
         self._create_devices(update_group_version=False)
-        # device_def, devices = self._create_devices()
-        # self.state['Devices'] = devices
-        # self.state['DeviceDefinition'] = device_def
-        # _update_state(self.state)
 
         # 3. Create Resources - policies for local and ML resource access.
         self.create_resources()
@@ -110,8 +104,6 @@ class GroupCommands(object):
         self.create_lambdas(update_group_version=False)
 
         self.create_connectors(update_group_version=False)
-
-        # 5. Create devices (coming soon)
 
         # 6. Create subscriptions
         self.create_subscriptions(update_group_version=False)
@@ -215,25 +207,27 @@ class GroupCommands(object):
         # 1. Remove all of the subscriptions
         self.remove_subscriptions()
 
-        # 2. Remove all of the cores and the associated devices
+        # 2. Remove all of the cores and the associated devices and certs
         self._remove_cores()
+
+        # 3. Remove all devices definitions and associated certificates
         self._remove_devices()
 
-        # 3. Remove all of the lambdas
+        # 4. Remove all of the lambdas
         self.remove_lambdas()
 
-        # 4. Remove all of the other resources that were being used (AI/ML related specifically)
+        # 5. Remove all of the other resources that were being used (AI/ML related specifically)
         self.remove_resources()
 
-        # 5. Reset all of the deployments - otherwise GreenGrass won't let us delete the group
+        # 6. Reset all of the deployments - otherwise GreenGrass won't let us delete the group
         log.info("Reseting deployments forcefully, if they exist")
         self._gg.reset_deployments(GroupId=self.state['Group']['Id'], Force=True)
 
-        # 6. Delete the group
+        # 7. Delete the group
         log.info("Deleting group '{0}'".format(self.state['Group']['Id']))
         self._gg.delete_group(GroupId=self.state['Group']['Id'])
 
-        # 7. Now that've removed the GreenGrass group, it is safe to delete the state file describing the current state of the group
+        # 8. Now that've removed the GreenGrass group, it is safe to delete the state file describing the current state of the group
         os.remove(STATE_FILE)
 
         log.info("[END] removing group {0}".format(self.group['Group']['name']))
@@ -753,7 +747,8 @@ class GroupCommands(object):
 
         log.info('Updated on Greengrass! Execute "greengo deploy" to apply')
 
-    # Create all of the devices that will be connected to the core
+    # Create and generate associated structures for non-core Devices
+    # that will connect to the core.
     def _create_devices(self, update_group_version=True):
         # TODO: Refactor-handle state internally, make callable individually
         #       Maybe reflet dependency tree in self.group/greensgo.yaml and travel it
@@ -904,7 +899,7 @@ class GroupCommands(object):
 
         _update_state(self.state)
 
-    # Remove all of the devices
+    # Remove all of the devices and detach associated structures
     def _remove_devices(self):
         # TODO: protect with try/catch ClientError
         # for every device
