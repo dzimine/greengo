@@ -644,6 +644,12 @@ class GroupCommands(object):
 
         loggers = self.group['Loggers']
         name = self.name + '_loggers'
+
+        for logger in loggers: 
+            if 'Space' in logger and logger['Type'] == 'AWSCloudWatch':
+                log.error("Logs of type AWSCloudWatch cannot have 'Space' key")
+                return
+        
         log.info("Creating loggers definition: '{0}'".format(name))
 
         # Create the Logger Definition
