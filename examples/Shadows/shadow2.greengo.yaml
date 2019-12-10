@@ -1,0 +1,78 @@
+# Greeengrass Group definition file
+Group:
+  name: Shadow2Group
+Cores:
+  - name: Shadow2GroupCore
+    key_path: ./certs
+    config_path: ./config
+    SyncShadow: False
+
+Lambdas:
+  - name: shadow2HW
+    handler: shadow2HW.function_handler
+    package: Lambdas
+    alias: dev
+    # role: 'arn:aws:iam::000000000000:role/base_lambda_role' # Use an existing role instead of auto-created one
+    environment:
+      foo: bar
+    greengrassConfig:
+      MemorySize: 128000 # Kb, ask AWS why
+      Timeout: 10 # Sec
+      Pinned: True # Set True for long-lived functions
+      Environment:
+        AccessSysfs: False
+        # ResourceAccessPolicies:
+          # - ResourceId: 1_path_to_input
+          #   Permission: 'rw'
+        Variables:
+           name: value
+
+
+Subscriptions:
+  - Source: Device::GG_Switch2
+    Target: GGShadowService
+    Subject: $aws/things/GG_TrafficLight2/shadow/update
+  - Source: GGShadowService
+    Target: Device::GG_Switch2
+    Subject: $aws/things/GG_TrafficLight2/shadow/update/accepted
+  - Source: GGShadowService
+    Target: Device::GG_Switch2
+    Subject: $aws/things/GG_TrafficLight2/shadow/update/rejected
+  - Source: Device::GG_TrafficLight2
+    Target: GGShadowService
+    Subject: $aws/things/GG_TrafficLight2/shadow/update
+  - Source: GGShadowService
+    Target: Device::GG_TrafficLight2
+    Subject: $aws/things/GG_TrafficLight2/shadow/update/delta
+  - Source: GGShadowService
+    Target: Device::GG_TrafficLight2
+    Subject: $aws/things/GG_TrafficLight2/shadow/update/accepted
+  - Source: GGShadowService
+    Target: Device::GG_TrafficLight2
+    Subject: $aws/things/GG_TrafficLight2/shadow/update/rejected
+#
+# Resources:
+#     # For parameter definitions, see http://boto3.readthedocs.io/en/latest/reference/services/greengrass.html#Greengrass.Client.create_resource_definition_version
+#   - Name: path_to_input
+#     Id: resource_1_path_to_input
+#     LocalVolumeResourceData:
+#       SourcePath: /images
+#       DestinationPath: /input
+#       GroupOwnerSetting:
+#         AutoAddGroupOwner: True
+
+Loggers:
+    # For parameter definitions, see https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/greengrass.html#Greengrass.Client.create_logger_definition
+  - Component: Lambda  # 'GreengrassSystem'|'Lambda'
+    Id: logger_1       # Arbitrary string
+    Level: DEBUG       # 'DEBUG'|'INFO'|'WARN'|'ERROR'|'FATAL'
+    Space: 1024        # The amount of file space, in KB, to use if the local file system is used for logging purposes
+    Type: FileSystem   # 'FileSystem'|'AWSCloudWatch'
+
+Devices:
+  - name: GG_TrafficLight2
+    key_path: ./certs
+    SyncShadow: True
+  - name: GG_Switch2
+    key_path: ./certs
+    SyncShadow: False
